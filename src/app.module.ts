@@ -4,6 +4,8 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { appConfig } from '../config';
+import { AuthResolver } from './auth/auth.resolver';
+import { AuthModule } from './auth/auth.module';
 
 // export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -18,8 +20,9 @@ import { appConfig } from '../config';
       envFilePath: ['.env'],
       load: [appConfig],
     }),
+    AuthModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, AuthResolver],
 })
 export class AppModule {}
