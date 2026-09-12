@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 // import { createObserveModule } from '@nestjs/observe';
-import { AppController } from './app.controller.js';
-import { AppService } from './app.service.js';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { ConfigModule } from '@nestjs/config';
+import { appConfig } from '../config';
 
 // export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -12,6 +14,10 @@ import { AppService } from './app.service.js';
     //   appSecret: 'YOUR_APP_SECRET',
     //   serviceId: 'aspheric-api',
     // }),
+    ConfigModule.forRoot({
+      envFilePath: ['.env'],
+      load: [appConfig],
+    }),
   ],
   controllers: [AppController],
   providers: [AppService],
