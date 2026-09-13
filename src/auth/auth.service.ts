@@ -41,7 +41,7 @@ export class AuthService {
   ) {}
 
   async hashPassword(password: string) {
-    const saltRounds = this.configService.get<number>('BCRYPT_SALT_ROUNDS');
+    const saltRounds = this.configService.get<number>('bcryptSaltRounds');
     const salt = await bcrypt.genSalt(saltRounds);
     return await bcrypt.hash(password, salt);
   }
