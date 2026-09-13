@@ -15,7 +15,7 @@ export class Auth {
   @Prop({
     type: String,
   })
-  authToken!: string;
+  accessToken!: string;
 }
 
 export const AuthSchema = SchemaFactory.createForClass(Auth);

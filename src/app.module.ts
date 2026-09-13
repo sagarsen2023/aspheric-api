@@ -2,10 +2,11 @@ import { Module } from '@nestjs/common';
 // import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { appConfig } from '../config';
-import { AuthResolver } from './auth/auth.resolver';
 import { AuthModule } from './auth/auth.module';
+import { UserModule } from './user/user.module';
+import { MongooseModule } from '@nestjs/mongoose';
 
 // export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -17,12 +18,20 @@ import { AuthModule } from './auth/auth.module';
     //   serviceId: 'aspheric-api',
     // }),
     ConfigModule.forRoot({
+      isGlobal: true,
       envFilePath: ['.env'],
       load: [appConfig],
     }),
+    MongooseModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        uri: config.get<string>('mongoDBUrl'),
+      }),
+    }),
     AuthModule,
+    UserModule,
   ],
   controllers: [AppController],
-  providers: [AppService, AuthResolver],
+  providers: [AppService],
 })
 export class AppModule {}
