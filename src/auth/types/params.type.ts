@@ -1,4 +1,4 @@
-import { UserRoles } from '../../user/entities/user.entity';
+import { UserRoles } from "../../user/types/user.type";
 
 export interface AuthParams {
   _id: string;
