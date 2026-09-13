@@ -6,6 +6,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { appConfig } from '../config';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
+import { AuditModule } from './audit/audit.module';
+import { RedisModule } from './redis/redis.module';
 import { MongooseModule } from '@nestjs/mongoose';
 
 // export const { ObserveModule, ObserveInstrument } = createObserveModule();
@@ -30,6 +32,8 @@ import { MongooseModule } from '@nestjs/mongoose';
     }),
     AuthModule,
     UserModule,
+    RedisModule,
+    AuditModule,
   ],
   controllers: [AppController],
   providers: [AppService],

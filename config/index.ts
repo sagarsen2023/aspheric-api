@@ -8,9 +8,9 @@ export const appConfig = () => ({
   ), // Default to 7 days in seconds
   nodeEnvironment: process.env.NODE_ENV,
 
-  // ? Cloudflare R2 storage
-  r2Endpoint: process.env.R2_ENDPOINT,
-  r2AccessKeyId: process.env.R2_ACCESS_KEY_ID,
-  r2SecretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
-  r2BucketName: process.env.R2_BUCKET_NAME,
+  // ? Redis (BullMQ queue + rate limiting)
+  redisHost: process.env.REDIS_HOST ?? '127.0.0.1',
+  redisPort: Number.parseInt(process.env.REDIS_PORT ?? '6379'),
+  redisPassword: process.env.REDIS_PASSWORD,
+  redisDb: Number.parseInt(process.env.REDIS_DB ?? '0'),
 });
