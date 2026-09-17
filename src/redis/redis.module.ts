@@ -7,11 +7,12 @@ import {
 } from '@nestjs/common';
 import type Redis from 'ioredis';
 import { REDIS_CLIENT, redisProvider } from './redis.provider';
+import { RateLimiterService } from './rate-limiter.service';
 
 @Global()
 @Module({
-  providers: [redisProvider],
-  exports: [REDIS_CLIENT],
+  providers: [redisProvider, RateLimiterService],
+  exports: [REDIS_CLIENT, RateLimiterService],
 })
 export class RedisModule implements OnModuleDestroy {
   private readonly logger = new Logger(RedisModule.name);

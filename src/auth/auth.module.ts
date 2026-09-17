@@ -14,6 +14,7 @@ import {
   ForgotPasswordSchema,
 } from './entities/forgot-password.entity';
 import { UserModule } from '../user/user.module';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { UserModule } from '../user/user.module';
       }),
     }),
     UserModule,
+    MailModule,
   ],
   controllers: [AuthController],
   providers: [AuthService],

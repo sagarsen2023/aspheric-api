@@ -1,11 +1,14 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { randomInt } from 'node:crypto';
 import { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
@@ -26,6 +29,18 @@ import {
 import { UserService } from '../user/user.service';
 import { CreateUserDto } from '../user/dto/user.dto';
 import { UserDocument } from '../user/entities/user.entity';
+import { MailService } from '../mail/mail.service';
+import { RateLimiterService } from '../redis/rate-limiter.service';
+
+/** How long registration and password reset codes stay valid. */
+const OTP_EXPIRY_MINUTES = 10;
+
+/**
+ * Registration codes per email address. The cooldown matches the console's
+ * "Resend code" timer; the hourly cap stops an address being flooded.
+ */
+const REGISTRATION_OTP_COOLDOWN = { limit: 1, windowSeconds: 30 };
+const REGISTRATION_OTP_HOURLY = { limit: 5, windowSeconds: 60 * 60 };
 
 @Injectable()
 export class AuthService {
@@ -33,6 +48,8 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly userService: UserService,
     private readonly configService: ConfigService,
+    private readonly mailService: MailService,
+    private readonly rateLimiter: RateLimiterService,
     @InjectModel(Auth.name) private readonly authModel: Model<Auth>,
     @InjectModel(Registration.name)
     private readonly registrationModel: Model<Registration>,
@@ -87,6 +104,10 @@ export class AuthService {
     const accessToken = await this.signWithJwt(payload);
 
     await this.registrationModel.findByIdAndDelete(isVerifiedUser?._id);
+
+    this.mailService
+      .sendWelcome({ email, name: newlyCreatedUser.name })
+      .catch(() => undefined);
 
     return { accessToken, user: newlyCreatedUser };
   }
@@ -177,9 +198,14 @@ export class AuthService {
     await this.forgotPasswordModel.create({
       email,
       otp,
-      expiryTime: Date.now() + 10 * 60 * 1000,
+      expiryTime: Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000,
     });
-    this.sendOtp();
+    await this.mailService.sendForgotPasswordOtp({
+      email,
+      name: user.name,
+      otp,
+      expiresInMinutes: OTP_EXPIRY_MINUTES,
+    });
     return { message: 'OTP sent successfully' };
   }
 
@@ -232,11 +258,35 @@ export class AuthService {
   generateOtp() {
     const isProduction =
       this.configService.get<string>('nodeEnvironment') === 'production';
-    return isProduction ? Math.floor(1000 + Math.random() * 900000) : 123456;
+    return isProduction ? randomInt(100_000, 1_000_000) : 123456;
   }
 
-  sendOtp() {
-    // TODO: send otp to phone number using sms service
+  /** Throws 429 when this email has had a code too recently or too often. */
+  async enforceRegistrationOtpLimit(email: string) {
+    const key = `registration-otp:${email.trim().toLowerCase()}`;
+
+    const cooldown = await this.rateLimiter.hit(
+      `${key}:cooldown`,
+      REGISTRATION_OTP_COOLDOWN,
+    );
+    if (!cooldown.allowed) {
+      throw new HttpException(
+        `Please wait ${cooldown.retryAfterSeconds} seconds before requesting another code.`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    const hourly = await this.rateLimiter.hit(
+      `${key}:hourly`,
+      REGISTRATION_OTP_HOURLY,
+    );
+    if (!hourly.allowed) {
+      const minutes = Math.ceil(hourly.retryAfterSeconds / 60);
+      throw new HttpException(
+        `Too many codes requested for this email. Try again in ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
   }
 
   async getOtpForRegistration(body: GetOtpForRegistrationDto) {
@@ -251,7 +301,8 @@ export class AuthService {
       throw new ConflictException('User with this email already exists');
     }
 
-    // TODO: Include a rate limiter here
+    await this.enforceRegistrationOtpLimit(email);
+
     const previousRegistration = await this.registrationModel.findOne({
       email,
     });
@@ -263,10 +314,14 @@ export class AuthService {
     await this.registrationModel.create({
       email,
       otp,
-      otpExpiryTime: Date.now() + 10 * 60 * 1000,
+      otpExpiryTime: Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000,
     });
 
-    this.sendOtp();
+    await this.mailService.sendRegistrationOtp({
+      email,
+      otp,
+      expiresInMinutes: OTP_EXPIRY_MINUTES,
+    });
 
     return { message: 'OTP sent successfully' };
   }
