@@ -3,6 +3,7 @@ import {
   AuditCategory,
   AuditReport,
   CategoryScore,
+  CategoryScoreBase,
   CheckResult,
   CheckStatus,
 } from '../types/audit.type';
@@ -41,6 +42,86 @@ export const gradeFor = (score: number | null): string => {
   return GRADES.find(([threshold]) => score >= threshold)?.[1] ?? 'F';
 };
 
+/**
+ * The overall score: a weighted average of the categories that could be
+ * scored. Unscored categories drop out and the rest are rescaled.
+ */
+const overallScore = (categories: CategoryScoreBase[]): number | null => {
+  const scored = categories.filter((entry) => entry.score !== null);
+  const totalWeight = scored.reduce(
+    (sum, entry) => sum + CATEGORY_WEIGHTS[entry.category],
+    0,
+  );
+  if (!totalWeight) return null;
+
+  return Math.round(
+    scored.reduce(
+      (sum, entry) => sum + (entry.score ?? 0) * CATEGORY_WEIGHTS[entry.category],
+      0,
+    ) / totalWeight,
+  );
+};
+
+/**
+ * Adds each category's weight, share of the overall score, the points it
+ * contributed and the points it could still add.
+ *
+ * Points are whole numbers split by largest remainder, so a report can list
+ * them and have them sum exactly to the overall score it shows. Also used to
+ * fill these fields in for reports stored before they existed.
+ */
+export const applyCategoryWeights = (
+  categories: CategoryScoreBase[],
+): CategoryScore[] => {
+  const scored = categories.filter((entry) => entry.score !== null);
+  const totalWeight = scored.reduce(
+    (sum, entry) => sum + CATEGORY_WEIGHTS[entry.category],
+    0,
+  );
+  const overall = overallScore(categories);
+
+  const exact = scored.map((entry) => ({
+    category: entry.category,
+    value:
+      ((entry.score ?? 0) * CATEGORY_WEIGHTS[entry.category]) / totalWeight,
+  }));
+  const points = new Map(
+    exact.map((entry) => [entry.category, Math.floor(entry.value)]),
+  );
+  let remainder =
+    (overall ?? 0) - [...points.values()].reduce((sum, value) => sum + value, 0);
+
+  for (const entry of [...exact].sort(
+    (a, b) => (b.value % 1) - (a.value % 1),
+  )) {
+    if (remainder <= 0) break;
+    points.set(entry.category, (points.get(entry.category) ?? 0) + 1);
+    remainder -= 1;
+  }
+
+  return categories.map((entry) => {
+    const weight = CATEGORY_WEIGHTS[entry.category];
+    if (entry.score === null || !totalWeight) {
+      return { ...entry, weight, share: null, points: null, potentialGain: null };
+    }
+    return {
+      ...entry,
+      weight,
+      share: Number((weight / totalWeight).toFixed(4)),
+      points: points.get(entry.category) ?? 0,
+      potentialGain: Math.round(((100 - entry.score) * weight) / totalWeight),
+    };
+  });
+};
+
+/** Reports stored before weights were recorded get them filled in on read. */
+export const withCategoryWeights = (
+  categories: Array<CategoryScoreBase | CategoryScore>,
+): CategoryScore[] =>
+  categories.every((entry) => 'weight' in entry && typeof entry.weight === 'number')
+    ? (categories as CategoryScore[])
+    : applyCategoryWeights(categories);
+
 @Injectable()
 export class ScoringService {
   /**
@@ -53,27 +134,12 @@ export class ScoringService {
       .map((category) => this.scoreCategory(category, checks))
       .filter((entry) => entry.passed + entry.warned + entry.failed + entry.skipped > 0);
 
-    const scored = categories.filter((entry) => entry.score !== null);
-
-    const totalWeight = scored.reduce(
-      (sum, entry) => sum + CATEGORY_WEIGHTS[entry.category],
-      0,
-    );
-
-    const overall = totalWeight
-      ? Math.round(
-          scored.reduce(
-            (sum, entry) =>
-              sum + (entry.score ?? 0) * CATEGORY_WEIGHTS[entry.category],
-            0,
-          ) / totalWeight,
-        )
-      : null;
+    const overall = overallScore(categories);
 
     return {
       score: overall,
       grade: gradeFor(overall),
-      categories,
+      categories: applyCategoryWeights(categories),
       checks,
     };
   }
@@ -81,7 +147,7 @@ export class ScoringService {
   private scoreCategory(
     category: AuditCategory,
     checks: CheckResult[],
-  ): CategoryScore {
+  ): CategoryScoreBase {
     const relevant = checks.filter((check) => check.category === category);
     const counted = relevant.filter(
       (check) => check.status !== CheckStatus.SKIPPED,

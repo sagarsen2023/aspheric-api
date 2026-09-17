@@ -7,8 +7,6 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { InjectQueue } from '@nestjs/bullmq';
-// `import type`: emitDecoratorMetadata cannot reference a value-imported type
-// from a decorated constructor signature.
 import type { ConfigType } from '@nestjs/config';
 import { auditConfig } from './audit.config';
 import { Queue } from 'bullmq';
@@ -20,18 +18,26 @@ import { CreateAuditDto, FindAuditsDto } from './dto/audit.dto';
 import { AuditRunnerService } from './audit-runner.service';
 import { assertSafeUrl } from './providers/url-guard';
 import { AUDIT_JOB, AUDIT_QUEUE, AuditJobData } from './audit.constants';
-import { AuditStatus, AuditStrategy } from './types/audit.type';
+import { AuditStatus, AuditStrategy, CategoryScore } from './types/audit.type';
+import { withCategoryWeights } from './scoring/scoring.service';
 import { InflightLockService } from './providers/inflight-lock.service';
 
 /**
  * A stored report as the API returns it: the plain document, with each check
- * carrying the static `impact` copy that is merged in on read.
+ * carrying the static `impact` copy that is merged in on read, and each
+ * category its place in the overall score.
  */
-export type AuditReportResponse = Omit<FlattenMaps<Audit>, 'checks'> & {
+export type AuditReportResponse = Omit<
+  FlattenMaps<Audit>,
+  'checks' | 'categories'
+> & {
   _id: Types.ObjectId;
   updatedAt?: Date;
+  categories: CategoryScore[];
   checks: EnrichedCheckResult[];
 };
+
+export type AuditListItemResponse = Omit<AuditReportResponse, 'checks'>;
 
 /** Drops the fragment and lowercases the host so cache keys line up. */
 export const normalizeUrl = (input: string): string => {
@@ -115,8 +121,6 @@ export class AuditService {
 
       return audit;
     } catch (error) {
-      // Nothing will ever run to release it, so hand the lock back now rather
-      // than leaving the client blocked until the TTL expires.
       await this.inflightLockService.release(lockKey, auditId);
       throw error;
     }
@@ -192,12 +196,16 @@ export class AuditService {
   async findOne(auditId: string): Promise<AuditReportResponse> {
     const audit = await this.auditModel.findOne({ auditId }).lean();
     if (!audit) throw new NotFoundException(`No audit found for id ${auditId}`);
-    return { ...audit, checks: withImpact(audit.checks) };
+    return {
+      ...audit,
+      categories: withCategoryWeights(audit.categories),
+      checks: withImpact(audit.checks),
+    };
   }
 
   async findAll(
     findAuditsDto: FindAuditsDto,
-  ): Promise<{ data: AuditDocument[]; totalCount: number }> {
+  ): Promise<{ data: AuditListItemResponse[]; totalCount: number }> {
     const filter: Record<string, unknown> = {};
 
     if (findAuditsDto.url) {
@@ -216,11 +224,18 @@ export class AuditService {
         .sort({ createdAt: -1 })
         .limit(20)
         // The full check list is large; the summary is enough for a listing.
-        .select('-checks'),
+        .select('-checks')
+        .lean(),
       this.auditModel.countDocuments(filter),
     ]);
 
-    return { data, totalCount };
+    return {
+      data: data.map(({ checks: _checks, ...audit }) => ({
+        ...audit,
+        categories: withCategoryWeights(audit.categories),
+      })),
+      totalCount,
+    };
   }
 
   /** Most recent completed audit still inside the cache window, if any. */
@@ -235,7 +250,9 @@ export class AuditService {
       .findOne({
         normalizedUrl,
         strategy,
-        status: { $in: [AuditStatus.COMPLETED, AuditStatus.QUEUED, AuditStatus.RUNNING] },
+        status: {
+          $in: [AuditStatus.COMPLETED, AuditStatus.QUEUED, AuditStatus.RUNNING],
+        },
         createdAt: { $gte: new Date(Date.now() - ttlSeconds * 1000) },
       })
       .sort({ createdAt: -1 });

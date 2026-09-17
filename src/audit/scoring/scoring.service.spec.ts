@@ -1,6 +1,14 @@
-import { ScoringService } from './scoring.service';
+import {
+  applyCategoryWeights,
+  ScoringService,
+  withCategoryWeights,
+} from './scoring.service';
 import { result } from '../types/check.type';
-import { AuditCategory, CheckStatus } from '../types/audit.type';
+import {
+  AuditCategory,
+  CategoryScoreBase,
+  CheckStatus,
+} from '../types/audit.type';
 
 const check = (
   id: string,
@@ -8,6 +16,19 @@ const check = (
   status: CheckStatus,
   weight = 1,
 ) => result({ id, title: id, category, status, weight });
+
+/** A scored category as stored, without its place in the overall score. */
+const base = (category: AuditCategory, score: number | null): CategoryScoreBase => ({
+  category,
+  score,
+  grade: 'N/A',
+  passed: 0,
+  warned: 0,
+  failed: 0,
+  skipped: 0,
+  coverage: score === null ? 0 : 1,
+  reliable: score !== null,
+});
 
 describe('ScoringService', () => {
   let service: ScoringService;
@@ -146,6 +167,65 @@ describe('ScoringService', () => {
       warned: 1,
       failed: 1,
       skipped: 1,
+    });
+  });
+
+  describe('place of each category in the overall score', () => {
+    it('splits the overall score into whole points that add up exactly', () => {
+      // Security 50 (weight 3) and crawlability 100 (weight 1): 37.5 + 25 = 62.5 => 63.
+      const report = service.score([
+        check('s1', AuditCategory.SECURITY, CheckStatus.PASS),
+        check('s2', AuditCategory.SECURITY, CheckStatus.FAIL),
+        check('c', AuditCategory.CRAWLABILITY, CheckStatus.PASS),
+      ]);
+
+      expect(report.score).toBe(63);
+      expect(report.categories).toMatchObject([
+        { category: AuditCategory.SECURITY, weight: 3, share: 0.75, points: 38, potentialGain: 38 },
+        { category: AuditCategory.CRAWLABILITY, weight: 1, share: 0.25, points: 25, potentialGain: 0 },
+      ]);
+    });
+
+    it('keeps points summing to the overall score across many categories', () => {
+      const categories = applyCategoryWeights([
+        base(AuditCategory.SECURITY, 25),
+        base(AuditCategory.PERFORMANCE, 51),
+        base(AuditCategory.ACCESSIBILITY, null),
+        base(AuditCategory.SEO, 67),
+        base(AuditCategory.DELIVERY, 75),
+        base(AuditCategory.CRAWLABILITY, 0),
+      ]);
+
+      // (25×3 + 51×3 + 67×2 + 75×1.5 + 0×1) / 10.5 = 45.19 => 45.
+      const points = categories.map((entry) => entry.points ?? 0);
+      expect(points.reduce((sum, value) => sum + value, 0)).toBe(45);
+      expect(categories.find((entry) => entry.category === AuditCategory.SECURITY)).toMatchObject({
+        share: 0.2857,
+        potentialGain: 21,
+      });
+    });
+
+    it('leaves an unscored category out of shares, points and gains, but reports its weight', () => {
+      const categories = applyCategoryWeights([
+        base(AuditCategory.SECURITY, 80),
+        base(AuditCategory.ACCESSIBILITY, null),
+      ]);
+
+      expect(categories[1]).toMatchObject({
+        weight: 2,
+        share: null,
+        points: null,
+        potentialGain: null,
+      });
+      expect(categories[0]).toMatchObject({ share: 1, points: 80, potentialGain: 20 });
+    });
+
+    it('fills the fields in for reports stored before they existed, and leaves newer ones alone', () => {
+      const stored = [base(AuditCategory.SECURITY, 50), base(AuditCategory.CRAWLABILITY, 100)];
+      const filled = withCategoryWeights(stored);
+
+      expect(filled.map((entry) => entry.points)).toEqual([38, 25]);
+      expect(withCategoryWeights(filled)).toBe(filled);
     });
   });
 

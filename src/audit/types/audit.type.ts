@@ -50,15 +50,19 @@ export interface CategoryScore {
   warned: number;
   failed: number;
   skipped: number;
-  /**
-   * Share of this category's total weight that actually ran, 0-1. A score of
-   * 100 built from one surviving check is not the same claim as one built from
-   * ten, and without this the consumer cannot tell them apart.
-   */
+
   coverage: number;
-  /** False when too little of the category ran to trust the score. */
   reliable: boolean;
+  weight: number;
+  share: number | null;
+  points: number | null;
+  potentialGain: number | null;
 }
+
+export type CategoryScoreBase = Omit<
+  CategoryScore,
+  'weight' | 'share' | 'points' | 'potentialGain'
+>;
 
 export interface AuditReport {
   score: number | null;
