@@ -47,8 +47,7 @@ export class AuditController {
   }
 
   @Get()
-  @UseGuards(AuthGuard, RolesGuard)
-  @Roles(UserRoles.SUPER_ADMIN)
+  @UseGuards(AuthGuard)
   @RateLimit({ limit: 60, windowSeconds: 60 })
   findAll(@Query() findAuditsDto: FindAuditsDto) {
     return this.auditService.findAll(findAuditsDto);

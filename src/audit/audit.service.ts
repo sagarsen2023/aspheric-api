@@ -208,6 +208,8 @@ export class AuditService {
   ): Promise<{ data: AuditListItemResponse[]; totalCount: number }> {
     const filter: Record<string, unknown> = {};
 
+    // TODO: Apply a query here that super admin can get all and other user can see what they have been done
+
     if (findAuditsDto.url) {
       try {
         filter.normalizedUrl = normalizeUrl(findAuditsDto.url);
