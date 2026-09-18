@@ -46,5 +46,6 @@ import { MailModule } from '../mail/mail.module';
   ],
   controllers: [AuthController],
   providers: [AuthService],
+  exports: [AuthService],
 })
 export class AuthModule {}

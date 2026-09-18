@@ -28,6 +28,7 @@ import { SeoCheck } from './checks/seo.check';
 import { CrawlabilityCheck } from './checks/crawlability.check';
 import { DeliveryCheck } from './checks/delivery.check';
 import { LighthouseCheck } from './checks/lighthouse.check';
+import { AuthModule } from '../auth/auth.module';
 
 const CHECKS = [
   HeadersCheck,
@@ -40,17 +41,12 @@ const CHECKS = [
   LighthouseCheck,
 ];
 
-/**
- * Collects every registered check into one injectable array, so adding a check
- * means adding it to CHECKS above and nothing else.
- */
 const checksProvider: Provider = {
   provide: AUDIT_CHECKS,
   inject: CHECKS,
   useFactory: (...checks: AuditCheck[]) => checks,
 };
 
-/** LIGHTHOUSE_PROVIDER picks which runner the LighthouseCheck receives. */
 const lighthouseRunnerProvider: Provider = {
   provide: LIGHTHOUSE_RUNNER,
   inject: [auditConfig.KEY, PsiProvider, LocalLighthouseProvider],
@@ -58,13 +54,11 @@ const lighthouseRunnerProvider: Provider = {
     config: ConfigType<typeof auditConfig>,
     psi: PsiProvider,
     local: LocalLighthouseProvider,
-  ) =>
-    config.lighthouseProvider === LighthouseProvider.LOCAL ? local : psi,
+  ) => (config.lighthouseProvider === LighthouseProvider.LOCAL ? local : psi),
 };
 
 @Module({
   imports: [
-    // Scopes the audit settings to this module instead of the root appConfig.
     ConfigModule.forFeature(auditConfig),
     MongooseModule.forFeature([{ name: Audit.name, schema: AuditSchema }]),
     BullModule.forRootAsync({
@@ -75,6 +69,7 @@ const lighthouseRunnerProvider: Provider = {
       }),
     }),
     BullModule.registerQueue({ name: AUDIT_QUEUE }),
+    AuthModule,
   ],
   controllers: [AuditController],
   providers: [
