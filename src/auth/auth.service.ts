@@ -32,13 +32,7 @@ import { UserDocument } from '../user/entities/user.entity';
 import { MailService } from '../mail/mail.service';
 import { RateLimiterService } from '../redis/rate-limiter.service';
 
-/** How long registration and password reset codes stay valid. */
 const OTP_EXPIRY_MINUTES = 10;
-
-/**
- * Registration codes per email address. The cooldown matches the console's
- * "Resend code" timer; the hourly cap stops an address being flooded.
- */
 const REGISTRATION_OTP_COOLDOWN = { limit: 1, windowSeconds: 30 };
 const REGISTRATION_OTP_HOURLY = { limit: 5, windowSeconds: 60 * 60 };
 
@@ -78,6 +72,7 @@ export class AuthService {
 
     const isVerifiedUser = await this.registrationModel.findOne({
       registrationToken,
+      email,
     });
 
     if (!isVerifiedUser) {
