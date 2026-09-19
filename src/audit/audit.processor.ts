@@ -15,7 +15,9 @@ export class AuditProcessor extends WorkerHost {
 
   async process(job: Job<AuditJobData>): Promise<void> {
     const { auditId, lockKey } = job.data;
-    this.logger.log(`Running audit ${auditId} (attempt ${job.attemptsMade + 1})`);
+    this.logger.log(
+      `Running audit ${auditId} (attempt ${job.attemptsMade + 1})`,
+    );
 
     try {
       await this.auditService.process(auditId);

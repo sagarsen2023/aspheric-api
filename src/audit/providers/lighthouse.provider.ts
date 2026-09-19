@@ -53,10 +53,8 @@ export interface RawLighthouseReport {
   >;
 }
 
-const metric = (
-  report: RawLighthouseReport,
-  id: string,
-): number | null => report.audits?.[id]?.numericValue ?? null;
+const metric = (report: RawLighthouseReport, id: string): number | null =>
+  report.audits?.[id]?.numericValue ?? null;
 
 /** Normalises a raw Lighthouse report into our provider-agnostic shape. */
 export const normaliseReport = (

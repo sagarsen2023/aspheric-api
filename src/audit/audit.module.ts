@@ -58,8 +58,7 @@ const lighthouseRunnerProvider: Provider = {
     config: ConfigType<typeof auditConfig>,
     psi: PsiProvider,
     local: LocalLighthouseProvider,
-  ) =>
-    config.lighthouseProvider === LighthouseProvider.LOCAL ? local : psi,
+  ) => (config.lighthouseProvider === LighthouseProvider.LOCAL ? local : psi),
 };
 
 @Module({

@@ -14,8 +14,13 @@ export class Auth {
 
   @Prop({
     type: String,
+    required: true,
+    unique: true,
   })
-  accessToken!: string;
+  accessTokenHash!: string;
+
+  @Prop({ type: Date, required: true, expires: 0 })
+  expiresAt!: Date;
 }
 
 export const AuthSchema = SchemaFactory.createForClass(Auth);

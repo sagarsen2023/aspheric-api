@@ -1,4 +1,11 @@
-import { IsEmail, IsNotEmpty, IsNumber, IsString } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsNumber,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class GetOtpForRegistrationDto {
   @IsNotEmpty()
@@ -33,12 +40,14 @@ export class ResetPasswordDto {
 
   @IsNotEmpty()
   @IsString()
+  @MinLength(12)
+  @MaxLength(128)
   newPassword!: string;
 }
 
 export class ForgotPasswordOtpDto {
   @IsNotEmpty()
-  @IsString()
+  @IsEmail()
   email!: string;
 }
 
@@ -49,5 +58,7 @@ export class ForgetPasswordOtpVerifyDto extends ForgotPasswordOtpDto {
 
   @IsNotEmpty()
   @IsString()
+  @MinLength(12)
+  @MaxLength(128)
   newPassword!: string;
 }

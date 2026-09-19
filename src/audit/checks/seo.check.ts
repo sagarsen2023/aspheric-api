@@ -24,7 +24,9 @@ export const extractSchemaTypes = (node: unknown): string[] => {
   const type = record['@type'];
   if (typeof type === 'string') types.push(type);
   else if (Array.isArray(type)) {
-    types.push(...type.filter((entry): entry is string => typeof entry === 'string'));
+    types.push(
+      ...type.filter((entry): entry is string => typeof entry === 'string'),
+    );
   }
 
   if (record['@graph']) types.push(...extractSchemaTypes(record['@graph']));

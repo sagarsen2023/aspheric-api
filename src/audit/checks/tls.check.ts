@@ -54,10 +54,7 @@ export class TlsCheck implements AuditCheck {
 
     let facts: TlsFacts;
     try {
-      facts = await this.handshake(
-        url.hostname,
-        Number(url.port) || 443,
-      );
+      facts = await this.handshake(url.hostname, Number(url.port) || 443);
     } catch (error) {
       return [
         ...results,
@@ -257,7 +254,9 @@ export class TlsCheck implements AuditCheck {
 
       socket.once('timeout', () => {
         socket.destroy();
-        reject(new Error(`TLS handshake timed out after ${HANDSHAKE_TIMEOUT}ms`));
+        reject(
+          new Error(`TLS handshake timed out after ${HANDSHAKE_TIMEOUT}ms`),
+        );
       });
     });
   }

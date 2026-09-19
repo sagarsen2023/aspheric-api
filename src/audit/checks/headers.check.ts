@@ -212,10 +212,12 @@ export class HeadersCheck implements AuditCheck {
     headers: Record<string, string>,
     category: AuditCategory,
   ): CheckResult {
-    const leaked = LEAKY_HEADERS.filter((name) => headers[name]).map((name) => ({
-      header: name,
-      value: headers[name],
-    }));
+    const leaked = LEAKY_HEADERS.filter((name) => headers[name]).map(
+      (name) => ({
+        header: name,
+        value: headers[name],
+      }),
+    );
 
     // A bare product name ("nginx") is common and low risk; a version is not.
     const withVersion = leaked.filter((entry) => /\d+\.\d+/.test(entry.value));

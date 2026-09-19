@@ -9,7 +9,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { errorHandler } from '../../config/error-handler';
 import {
   ForgetPasswordOtpVerifyDto,
   ForgotPasswordOtpDto,
@@ -19,115 +18,86 @@ import {
   VerifyOtpForRegistrationDto,
 } from './dto/auth.dto';
 import { UserService } from '../user/user.service';
-import { CreateUserDto } from '../user/dto/user.dto';
+import { CreateUserDto, UpdateProfileDto } from '../user/dto/user.dto';
 import { AuthGuard } from './guards/auth.guard';
+import type { Request } from 'express';
+import type { AuthParams } from './types/params.type';
+import { RegistrationService } from './registration.service';
+import { PasswordRecoveryService } from './password-recovery.service';
+
+type AuthenticatedRequest = Request & { user: AuthParams; authToken: string };
 
 @Controller('auth')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
+    private readonly registrationService: RegistrationService,
+    private readonly passwordRecoveryService: PasswordRecoveryService,
     private readonly userService: UserService,
   ) {}
 
   @Post('get-otp-for-registration')
   async getOtp(@Body() body: GetOtpForRegistrationDto) {
-    try {
-      return await this.authService.getOtpForRegistration(body);
-    } catch (e) {
-      errorHandler(e);
-    }
+    return this.registrationService.requestOtp(body);
   }
 
   @Post('verify-otp-for-registration')
   async verifyOtp(@Body() body: VerifyOtpForRegistrationDto) {
-    try {
-      return await this.authService.verifyAndGetTokenForRegistration(body);
-    } catch (e) {
-      errorHandler(e);
-    }
+    return this.registrationService.verifyOtp(body);
   }
 
   @Post('register')
   async register(@Body() createUserDto: CreateUserDto) {
-    try {
-      return await this.authService.register(createUserDto);
-    } catch (e) {
-      errorHandler(e);
-    }
+    return this.registrationService.register(createUserDto);
   }
 
   @Post('login')
   async login(@Body() loginUserDto: LoginDto) {
-    try {
-      return await this.authService.login(loginUserDto);
-    } catch (e) {
-      errorHandler(e);
-    }
+    return this.authService.login(loginUserDto);
   }
 
   @Get('profile')
   @UseGuards(AuthGuard)
-  async getProfile(@Req() req) {
-    try {
-      const userId = req.user._id as string;
-      return await this.authService.getProfile(userId);
-    } catch (e) {
-      errorHandler(e);
-    }
+  async getProfile(@Req() req: AuthenticatedRequest) {
+    return this.authService.getProfile(req.user._id);
   }
 
   @Patch('profile')
   @UseGuards(AuthGuard)
-  async updateProfile(@Req() req, @Body() updateData: Partial<CreateUserDto>) {
-    try {
-      const userId = req.user._id as string;
-      return await this.userService.update({
-        id: userId,
-        updateUserDto: updateData,
-      });
-    } catch (e) {
-      errorHandler(e);
-    }
+  async updateProfile(
+    @Req() req: AuthenticatedRequest,
+    @Body() updateData: UpdateProfileDto,
+  ) {
+    const user = await this.userService.update({
+      id: req.user._id,
+      updateUserDto: updateData,
+    });
+    return user ? this.userService.toPublic(user) : null;
   }
 
   @Delete('logout')
   @UseGuards(AuthGuard)
-  async logout(@Req() req) {
-    try {
-      const userId = req.user._id as string;
-      await this.authService.logout(userId);
-      return { message: 'Logged out successfully' };
-    } catch (e) {
-      errorHandler(e);
-    }
+  async logout(@Req() req: AuthenticatedRequest) {
+    await this.authService.logout(req.authToken);
+    return { message: 'Logged out successfully' };
   }
 
   @Patch('reset-password')
   @UseGuards(AuthGuard)
-  async resetPassword(@Req() req, @Body() body: ResetPasswordDto) {
-    try {
-      const userId = req.user._id as string;
-      return await this.authService.resetPassword({ body, userId });
-    } catch (e) {
-      errorHandler(e);
-    }
+  async resetPassword(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: ResetPasswordDto,
+  ) {
+    return this.authService.resetPassword({ body, userId: req.user._id });
   }
 
   @Post('get-otp-for-forgot-password')
   async getOtpForForgotPassword(@Body() body: ForgotPasswordOtpDto) {
-    try {
-      return await this.authService.getOtpForForgotPassword(body);
-    } catch (e) {
-      errorHandler(e);
-    }
+    return this.passwordRecoveryService.requestOtp(body);
   }
 
   @Post('verify-otp-for-forgot-password')
   async verifyOtpForForgotPassword(@Body() body: ForgetPasswordOtpVerifyDto) {
-    try {
-      return await this.authService.verifyOtpForForgotPassword(body);
-    } catch (e) {
-      errorHandler(e);
-    }
+    return this.passwordRecoveryService.reset(body);
   }
 }

@@ -11,7 +11,7 @@ import type { ConfigType } from '@nestjs/config';
 import { auditConfig } from './audit.config';
 import { Queue } from 'bullmq';
 import { FlattenMaps, Model, Types } from 'mongoose';
-import { uuid } from '../../utils/uuid';
+import { randomUUID } from 'node:crypto';
 import { Audit, AuditDocument } from './entities/audit.entity';
 import { EnrichedCheckResult, withImpact } from './checks/check-impact';
 import { CreateAuditDto, FindAuditsDto } from './dto/audit.dto';
@@ -22,11 +22,6 @@ import { AuditStatus, AuditStrategy, CategoryScore } from './types/audit.type';
 import { withCategoryWeights } from './scoring/scoring.service';
 import { InflightLockService } from './providers/inflight-lock.service';
 
-/**
- * A stored report as the API returns it: the plain document, with each check
- * carrying the static `impact` copy that is merged in on read, and each
- * category its place in the overall score.
- */
 export type AuditReportResponse = Omit<
   FlattenMaps<Audit>,
   'checks' | 'categories'
@@ -81,7 +76,7 @@ export class AuditService {
       if (cached) return cached;
     }
 
-    const auditId = uuid();
+    const auditId = randomUUID();
     const lockKey = this.inflightLockService.key(clientId);
 
     const { acquired, heldBy } = await this.inflightLockService.acquire(

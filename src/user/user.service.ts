@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
+import { CreateUserDto, PublicUser, UpdateProfileDto } from './dto/user.dto';
 import { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import { User, type UserDocument } from './entities/user.entity';
@@ -15,6 +15,15 @@ export class UserService {
     return await createdUser.save();
   }
 
+  toPublic(user: UserDocument): PublicUser {
+    return {
+      _id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    };
+  }
+
   async findOne({
     id,
     includePassword,
@@ -22,10 +31,9 @@ export class UserService {
     id: string;
     includePassword?: boolean;
   }) {
-    const user = await this.userModel
-      .findOne({ _id: id })
-      .select(`${includePassword ? '+password' : ''}`);
-    return user;
+    const query = this.userModel.findById(id);
+    if (includePassword) query.select('+password');
+    return query;
   }
 
   async findOneByEmail({
@@ -35,12 +43,12 @@ export class UserService {
     email: string;
     includePassword?: boolean;
   }) {
-    const query = this.userModel.findOne({ email });
+    const query = this.userModel.findOne({ email: email.trim().toLowerCase() });
     if (includePassword) {
       query.select('+password');
     }
 
-    return await query;
+    return query;
   }
 
   async update({
@@ -48,33 +56,12 @@ export class UserService {
     updateUserDto,
   }: {
     id: string;
-    updateUserDto: UpdateUserDto;
+    updateUserDto: UpdateProfileDto;
   }) {
-    return await this.userModel.findByIdAndUpdate(id, updateUserDto, {
+    return this.userModel.findByIdAndUpdate(id, updateUserDto, {
       returnDocument: 'after',
+      runValidators: true,
     });
-  }
-
-  async managePublicationAndVerification({
-    id,
-    isPublished,
-  }: {
-    id: string;
-    isPublished?: boolean;
-  }) {
-    return await this.userModel.findByIdAndUpdate(
-      id,
-      { isPublished },
-      { returnDocument: 'after' },
-    );
-  }
-
-  async remove(id: string) {
-    return await this.userModel.findByIdAndUpdate(
-      id,
-      { isDeleted: true },
-      { returnDocument: 'after' },
-    );
   }
 
   async updatePassword({
@@ -84,7 +71,7 @@ export class UserService {
     id: string;
     hashedPassword: string;
   }) {
-    return await this.userModel.findByIdAndUpdate(
+    return this.userModel.findByIdAndUpdate(
       id,
       { password: hashedPassword },
       { returnDocument: 'after' },

@@ -157,7 +157,9 @@ export class CrawlabilityCheck implements AuditCheck {
   private async probe(url: string): Promise<ProbeResult> {
     const startedAt = Date.now();
     try {
-      const response = await this.fetcher.fetch(url, { timeout: PROBE_TIMEOUT });
+      const response = await this.fetcher.fetch(url, {
+        timeout: PROBE_TIMEOUT,
+      });
       return {
         reached: true,
         statusCode: response.statusCode,

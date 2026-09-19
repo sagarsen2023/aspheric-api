@@ -2,14 +2,13 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 
 @Schema({
   versionKey: false,
-  expires: '600s', // Expire in 10 minutes,
 })
 export class ForgotPassword {
-  @Prop({ required: true, index: true })
+  @Prop({ required: true, unique: true })
   email!: string;
 
-  @Prop()
-  otp?: number;
+  @Prop({ required: true })
+  otpHash!: string;
 
   @Prop({ required: false, type: Date })
   expiryTime?: Date;

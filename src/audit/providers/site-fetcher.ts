@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { assertSafeUrl } from './url-guard';
+import { Agent } from 'undici';
+import { isIP } from 'node:net';
 
 export interface FetchResult {
   finalUrl: string;
@@ -23,11 +25,6 @@ const USER_AGENT =
 export class SiteFetcher {
   private readonly logger = new Logger(SiteFetcher.name);
 
-  /**
-   * Fetches a URL with redirects followed by hand. `fetch`'s own redirect
-   * handling would bypass assertSafeUrl on hops 2..n, which is exactly how a
-   * public host tricks you into requesting 169.254.169.254.
-   */
   async fetch(
     input: string,
     options: {
@@ -49,8 +46,16 @@ export class SiteFetcher {
     const startedAt = Date.now();
 
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-      const { url } = await assertSafeUrl(current);
+      const { url, addresses } = await assertSafeUrl(current);
       redirectChain.push(url.toString());
+
+      const address = addresses[0];
+      const dispatcher = new Agent({
+        connect: {
+          lookup: (_hostname, _options, callback) =>
+            callback(null, address, isIP(address)),
+        },
+      });
 
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeout);
@@ -63,13 +68,16 @@ export class SiteFetcher {
           signal: controller.signal,
           headers: {
             'user-agent': USER_AGENT,
-            accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            accept:
+              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'accept-language': 'en-US,en;q=0.9',
             ...extraHeaders,
           },
-        });
+          dispatcher,
+        } as RequestInit & { dispatcher: Agent });
       } catch (error) {
         clearTimeout(timer);
+        await dispatcher.close().catch(() => undefined);
         const reason = error instanceof Error ? error.message : String(error);
         throw new BadRequestException(
           `Could not reach ${url.toString()}: ${reason}`,
@@ -82,6 +90,7 @@ export class SiteFetcher {
       if (response.status >= 300 && response.status < 400 && location) {
         clearTimeout(timer);
         await response.body?.cancel().catch(() => undefined);
+        await dispatcher.close().catch(() => undefined);
         if (hop === MAX_REDIRECTS) {
           throw new BadRequestException(
             `Too many redirects (>${MAX_REDIRECTS}) starting at ${input}`,
@@ -96,6 +105,7 @@ export class SiteFetcher {
           ? await this.readCapped(response, controller)
           : '';
       clearTimeout(timer);
+      await dispatcher.close().catch(() => undefined);
 
       return {
         finalUrl: url.toString(),
@@ -112,7 +122,6 @@ export class SiteFetcher {
     throw new BadRequestException(`Too many redirects starting at ${input}`);
   }
 
-  /** Reads at most MAX_BODY_BYTES so a huge or endless response can't OOM us. */
   private async readCapped(
     response: Response,
     controller: AbortController,
@@ -151,7 +160,6 @@ export class SiteFetcher {
   private flattenHeaders(headers: Headers): Record<string, string> {
     const flat: Record<string, string> = {};
     headers.forEach((value, key) => {
-      // set-cookie is handled separately; joining multiples loses the split.
       if (key.toLowerCase() !== 'set-cookie') flat[key.toLowerCase()] = value;
     });
     return flat;

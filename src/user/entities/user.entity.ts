@@ -14,11 +14,16 @@ export class User {
   name!: string;
 
   @Prop({
+    type: String,
     required: true,
+    unique: true,
+    lowercase: true,
+    trim: true,
   })
-  email?: string;
+  email!: string;
 
   @Prop({
+    type: String,
     required: true,
     enum: UserRoles,
     default: UserRoles.USER,
@@ -32,6 +37,4 @@ export class User {
   password!: string;
 }
 
-export const UserSchema = SchemaFactory.createForClass(User).index({
-  email: 1,
-});
+export const UserSchema = SchemaFactory.createForClass(User);

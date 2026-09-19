@@ -2,7 +2,6 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 
 @Schema({
   versionKey: false,
-  expires: 172800, // 2 days
 })
 export class Registration {
   @Prop({ unique: true })
@@ -11,8 +10,8 @@ export class Registration {
   @Prop()
   registrationToken?: string;
 
-  @Prop()
-  otp!: number;
+  @Prop({ required: true })
+  otpHash!: string;
 
   @Prop()
   otpExpiryTime!: Date;

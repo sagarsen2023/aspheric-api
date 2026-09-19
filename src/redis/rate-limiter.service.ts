@@ -1,4 +1,9 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import type Redis from 'ioredis';
 import { REDIS_CLIENT } from './redis.provider';
@@ -8,6 +13,8 @@ export interface RateLimitRule {
   limit: number;
   /** Window length in seconds. */
   windowSeconds: number;
+  /** Public read endpoints may fail open; sensitive actions should not. */
+  failOpen?: boolean;
 }
 
 export interface RateLimitResult {
@@ -49,12 +56,16 @@ export class RateLimiterService {
         retryAfterSeconds: ttl > 0 ? ttl : rule.windowSeconds,
       };
     } catch (error) {
-      // Redis being down must not take the endpoint down with it.
       this.logger.error(
-        `Rate limit check failed, allowing request: ${
+        `Rate limit check failed: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
+      if (rule.failOpen === false) {
+        throw new ServiceUnavailableException(
+          'Request limiting is temporarily unavailable. Try again shortly.',
+        );
+      }
       return { allowed: true, retryAfterSeconds: 0 };
     }
   }

@@ -4,7 +4,6 @@ import { SiteFetcher } from './providers/site-fetcher';
 import { assertSafeUrl } from './providers/url-guard';
 import { ScoringService } from './scoring/scoring.service';
 import {
-  AuditCategory,
   AuditContext,
   AuditReport,
   AuditStrategy,
@@ -46,10 +45,6 @@ export class AuditRunnerService {
     private readonly scoringService: ScoringService,
   ) {}
 
-  /**
-   * Fetches the page once, then fans every check out over that shared context.
-   * One slow or broken check degrades its own results only.
-   */
   async run(url: string, strategy: AuditStrategy): Promise<AuditReport> {
     const { url: safeUrl } = await assertSafeUrl(url);
     const response = await this.fetcher.fetch(safeUrl.toString());
@@ -97,9 +92,5 @@ export class AuditRunnerService {
     });
 
     return this.scoringService.score(checks);
-  }
-
-  categories(): AuditCategory[] {
-    return Object.values(AuditCategory);
   }
 }

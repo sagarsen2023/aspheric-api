@@ -42,10 +42,6 @@ export const gradeFor = (score: number | null): string => {
   return GRADES.find(([threshold]) => score >= threshold)?.[1] ?? 'F';
 };
 
-/**
- * The overall score: a weighted average of the categories that could be
- * scored. Unscored categories drop out and the rest are rescaled.
- */
 const overallScore = (categories: CategoryScoreBase[]): number | null => {
   const scored = categories.filter((entry) => entry.score !== null);
   const totalWeight = scored.reduce(
@@ -56,20 +52,13 @@ const overallScore = (categories: CategoryScoreBase[]): number | null => {
 
   return Math.round(
     scored.reduce(
-      (sum, entry) => sum + (entry.score ?? 0) * CATEGORY_WEIGHTS[entry.category],
+      (sum, entry) =>
+        sum + (entry.score ?? 0) * CATEGORY_WEIGHTS[entry.category],
       0,
     ) / totalWeight,
   );
 };
 
-/**
- * Adds each category's weight, share of the overall score, the points it
- * contributed and the points it could still add.
- *
- * Points are whole numbers split by largest remainder, so a report can list
- * them and have them sum exactly to the overall score it shows. Also used to
- * fill these fields in for reports stored before they existed.
- */
 export const applyCategoryWeights = (
   categories: CategoryScoreBase[],
 ): CategoryScore[] => {
@@ -89,7 +78,8 @@ export const applyCategoryWeights = (
     exact.map((entry) => [entry.category, Math.floor(entry.value)]),
   );
   let remainder =
-    (overall ?? 0) - [...points.values()].reduce((sum, value) => sum + value, 0);
+    (overall ?? 0) -
+    [...points.values()].reduce((sum, value) => sum + value, 0);
 
   for (const entry of [...exact].sort(
     (a, b) => (b.value % 1) - (a.value % 1),
@@ -102,7 +92,13 @@ export const applyCategoryWeights = (
   return categories.map((entry) => {
     const weight = CATEGORY_WEIGHTS[entry.category];
     if (entry.score === null || !totalWeight) {
-      return { ...entry, weight, share: null, points: null, potentialGain: null };
+      return {
+        ...entry,
+        weight,
+        share: null,
+        points: null,
+        potentialGain: null,
+      };
     }
     return {
       ...entry,
@@ -118,21 +114,21 @@ export const applyCategoryWeights = (
 export const withCategoryWeights = (
   categories: Array<CategoryScoreBase | CategoryScore>,
 ): CategoryScore[] =>
-  categories.every((entry) => 'weight' in entry && typeof entry.weight === 'number')
+  categories.every(
+    (entry) => 'weight' in entry && typeof entry.weight === 'number',
+  )
     ? (categories as CategoryScore[])
     : applyCategoryWeights(categories);
 
 @Injectable()
 export class ScoringService {
-  /**
-   * Skipped checks are excluded from both numerator and denominator, so a
-   * check that could not run lowers confidence rather than the score. A
-   * category where everything was skipped scores null, not zero.
-   */
   score(checks: CheckResult[]): AuditReport {
     const categories = Object.values(AuditCategory)
       .map((category) => this.scoreCategory(category, checks))
-      .filter((entry) => entry.passed + entry.warned + entry.failed + entry.skipped > 0);
+      .filter(
+        (entry) =>
+          entry.passed + entry.warned + entry.failed + entry.skipped > 0,
+      );
 
     const overall = overallScore(categories);
 
@@ -169,9 +165,12 @@ export class ScoringService {
       grade: gradeFor(score),
       coverage: Number(coverage.toFixed(2)),
       reliable: score !== null && coverage >= MIN_RELIABLE_COVERAGE,
-      passed: relevant.filter((check) => check.status === CheckStatus.PASS).length,
-      warned: relevant.filter((check) => check.status === CheckStatus.WARN).length,
-      failed: relevant.filter((check) => check.status === CheckStatus.FAIL).length,
+      passed: relevant.filter((check) => check.status === CheckStatus.PASS)
+        .length,
+      warned: relevant.filter((check) => check.status === CheckStatus.WARN)
+        .length,
+      failed: relevant.filter((check) => check.status === CheckStatus.FAIL)
+        .length,
       skipped: relevant.filter((check) => check.status === CheckStatus.SKIPPED)
         .length,
     };

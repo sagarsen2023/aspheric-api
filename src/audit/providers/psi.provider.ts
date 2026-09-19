@@ -26,11 +26,6 @@ interface PsiResponse {
   error?: { message?: string };
 }
 
-/**
- * Runs Lighthouse on Google's infrastructure. No Chrome in our container, but
- * the target must be publicly reachable and we are subject to Google's quota
- * (25k/day with a key, far less without).
- */
 @Injectable()
 export class PsiProvider implements LighthouseRunner {
   readonly provider = LighthouseProvider.PSI;
@@ -64,9 +59,9 @@ export class PsiProvider implements LighthouseRunner {
 
       if (!response.ok || !payload.lighthouseResult) {
         const reason =
-          payload.error?.message ?? `PageSpeed Insights returned ${response.status}`;
-        // 429 here means the shared quota is exhausted, which is operational
-        // rather than a fault of the audited site.
+          payload.error?.message ??
+          `PageSpeed Insights returned ${response.status}`;
+
         throw new ServiceUnavailableException(
           `PageSpeed Insights failed: ${reason}`,
         );

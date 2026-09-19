@@ -183,7 +183,8 @@ export class LighthouseCheck implements AuditCheck {
       if (value <= vital.good) status = CheckStatus.PASS;
       else if (value <= vital.poor) status = CheckStatus.WARN;
 
-      const rounded = vital.unit === 'ms' ? Math.round(value) : Number(value.toFixed(3));
+      const rounded =
+        vital.unit === 'ms' ? Math.round(value) : Number(value.toFixed(3));
 
       return result({
         id: vital.id,

@@ -1,6 +1,6 @@
-import { CreateUserDto } from '../../user/dto/user.dto';
+import { PublicUser } from '../../user/dto/user.dto';
 
 export interface RegistrationResponse {
   accessToken: string;
-  user: Partial<CreateUserDto>;
+  user: PublicUser;
 }
