@@ -16,6 +16,7 @@ import { RateLimit, RateLimitGuard } from './guards/rate-limit.guard';
 import { AuditStatus } from './types/audit.type';
 import type { Request } from 'express';
 import { clientIdentifier } from './providers/client-ip';
+import { AuthGuard } from '../auth/guards/auth.guard';
 
 @Controller('audit')
 @UseGuards(RateLimitGuard)
@@ -44,6 +45,7 @@ export class AuditController {
   }
 
   @Get()
+  @UseGuards(AuthGuard)
   @RateLimit({ limit: 60, windowSeconds: 60 })
   findAll(@Query() findAuditsDto: FindAuditsDto) {
     return this.auditService.findAll(findAuditsDto);

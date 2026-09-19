@@ -48,5 +48,6 @@ import { PasswordRecoveryService } from './password-recovery.service';
   ],
   controllers: [AuthController],
   providers: [AuthService, RegistrationService, PasswordRecoveryService],
+  exports: [AuthService],
 })
 export class AuthModule {}
