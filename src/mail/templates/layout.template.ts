@@ -1,10 +1,4 @@
 import { MailTemplateContext } from '../types/mail.type';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
-const logoDataUri = `data:image/png;base64,${readFileSync(
-  join(__dirname, '../assets/dark-aspheric-logo.png'),
-).toString('base64')}`;
 
 const color = {
   page: '#f5f5f4',
@@ -68,7 +62,6 @@ export function button(href: string, label: string): string {
 </table>`;
 }
 
-/** A numbered list of short steps, each with a bold title. */
 export function steps(items: { title: string; body: string }[]): string {
   const rows = items
     .map(
@@ -92,6 +85,30 @@ export function divider(): string {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 20px;"><tr><td style="border-top:1px solid ${color.border};font-size:0;line-height:0;">&nbsp;</td></tr></table>`;
 }
 
+function isReachableLogoUrl(url: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+
+  return (
+    (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
+    !['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname)
+  );
+}
+
+function logo(context: MailTemplateContext): string {
+  const wordmark = `font-family:${font};font-size:16px;line-height:25px;font-weight:600;letter-spacing:4px;color:${color.onBrand};`;
+
+  if (!isReachableLogoUrl(context.logoUrl)) {
+    return `<span style="display:inline-block;${wordmark}">ASPHERIC</span>`;
+  }
+
+  return `<img src="${escapeHtml(context.logoUrl)}" width="149" height="25" alt="ASPHERIC" style="display:block;border:0;outline:none;text-decoration:none;${wordmark}">`;
+}
+
 interface LayoutOptions {
   subject: string;
   preheader: string;
@@ -105,7 +122,6 @@ export function renderLayout(
   context: MailTemplateContext,
   options: LayoutOptions,
 ): string {
-  // Padding after the preheader stops clients pulling body text into the preview.
   const preheaderPadding = '&#847;&zwnj;&nbsp;'.repeat(60);
 
   return `<!doctype html>
@@ -134,7 +150,7 @@ export function renderLayout(
           <tr>
             <td class="px" style="background:${color.brand};border-radius:16px 16px 0 0;padding:26px 40px;">
               <a href="${escapeHtml(context.consoleUrl)}" style="text-decoration:none;">
-                <img src="${logoDataUri}" width="44" height="44" alt="Aspheric" style="display:block;border:0;outline:none;text-decoration:none;font-family:${font};font-size:16px;line-height:44px;font-weight:600;color:${color.onBrand};">
+                ${logo(context)}
               </a>
             </td>
           </tr>
@@ -159,7 +175,6 @@ export function renderLayout(
 </html>`;
 }
 
-/** The plain-text part: same message, no markup. */
 export function renderText(lines: string[]): string {
   return [...lines, '', '--', 'Aspheric · Know before the store does.'].join(
     '\n',

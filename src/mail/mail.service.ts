@@ -71,7 +71,10 @@ export class MailService implements OnModuleInit {
   }
 
   private get templateContext(): MailTemplateContext {
-    return { consoleUrl: this.config.consoleUrl };
+    return {
+      consoleUrl: this.config.consoleUrl,
+      logoUrl: this.config.logoUrl,
+    };
   }
 
   private async send(message: MailMessage): Promise<void> {
