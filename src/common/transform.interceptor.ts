@@ -7,8 +7,11 @@ import {
 import type { Response } from 'express';
 import { map, type Observable } from 'rxjs';
 
-interface Paginated<T> {
+interface DataResponse<T> {
   data: T;
+}
+
+interface Paginated {
   totalCount: number;
 }
 
@@ -28,17 +31,16 @@ export class TransformInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       map((body: unknown) => {
-        const paginated = hasOwn(body, 'data') && hasOwn(body, 'totalCount');
+        const hasData = hasOwn(body, 'data');
+        const paginated = hasOwn(body, 'totalCount');
         const message = hasOwn(body, 'message')
           ? (body as MessageResponse).message
           : undefined;
 
         return {
           statusCode,
-          data: paginated ? (body as Paginated<unknown>).data : body,
-          ...(paginated
-            ? { totalCount: (body as Paginated<unknown>).totalCount }
-            : {}),
+          data: hasData ? (body as DataResponse<unknown>).data : body,
+          ...(paginated ? { totalCount: (body as Paginated).totalCount } : {}),
           ...(message ? { message } : {}),
           timestamp: new Date().toISOString(),
         };
