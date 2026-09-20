@@ -1,13 +1,10 @@
 import { MailTemplateContext } from '../types/mail.type';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
-/*
- * Email markup is deliberately old-fashioned: nested tables and inline styles
- * are what Gmail, Outlook and Apple Mail all render the same way. Colours
- * mirror the console's stone palette; the logo is a PNG because most clients
- * block SVG.
- */
-
-export const LOGO_PATH = '/mail/aspheric-lockup-white.png';
+const logoDataUri = `data:image/png;base64,${readFileSync(
+  join(__dirname, '../assets/dark-aspheric-logo.png'),
+).toString('base64')}`;
 
 const color = {
   page: '#f5f5f4',
@@ -26,7 +23,6 @@ const font =
 const monoFont =
   "'Geist Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace";
 
-/** Escapes text for HTML. Apply it to every value a user can influence. */
 export function escapeHtml(value: string | number): string {
   return String(value)
     .replace(/&/g, '&amp;')
@@ -52,7 +48,6 @@ export function link(href: string, label: string): string {
   return `<a href="${escapeHtml(href)}" style="color:${color.heading};font-weight:600;text-decoration:underline;">${label}</a>`;
 }
 
-/** A large, spaced-out one-time code in a tinted panel. */
 export function codeBlock(code: string | number): string {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 24px;">
   <tr>
@@ -99,13 +94,10 @@ export function divider(): string {
 
 interface LayoutOptions {
   subject: string;
-  /** Inbox preview text, shown after the subject. */
   preheader: string;
   eyebrow: string;
   title: string;
-  /** Pre-built HTML for the card body. */
   content: string;
-  /** Why the recipient got this email. */
   footerNote: string;
 }
 
@@ -113,7 +105,6 @@ export function renderLayout(
   context: MailTemplateContext,
   options: LayoutOptions,
 ): string {
-  const logoUrl = `${context.consoleUrl}${LOGO_PATH}`;
   // Padding after the preheader stops clients pulling body text into the preview.
   const preheaderPadding = '&#847;&zwnj;&nbsp;'.repeat(60);
 
@@ -143,7 +134,7 @@ export function renderLayout(
           <tr>
             <td class="px" style="background:${color.brand};border-radius:16px 16px 0 0;padding:26px 40px;">
               <a href="${escapeHtml(context.consoleUrl)}" style="text-decoration:none;">
-                <img src="${escapeHtml(logoUrl)}" width="149" height="25" alt="ASPHERIC" style="display:block;border:0;outline:none;text-decoration:none;font-family:${font};font-size:16px;line-height:25px;font-weight:600;letter-spacing:4px;color:${color.onBrand};">
+                <img src="${logoDataUri}" width="44" height="44" alt="Aspheric" style="display:block;border:0;outline:none;text-decoration:none;font-family:${font};font-size:16px;line-height:44px;font-weight:600;color:${color.onBrand};">
               </a>
             </td>
           </tr>

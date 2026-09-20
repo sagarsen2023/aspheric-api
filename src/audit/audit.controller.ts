@@ -15,13 +15,16 @@ import { CreateAuditDto, FindAuditsDto } from './dto/audit.dto';
 import { RateLimit, RateLimitGuard } from './guards/rate-limit.guard';
 import { AuditStatus } from './types/audit.type';
 import type { Request } from 'express';
-import { clientIdentifier } from './providers/client-ip';
 import { AuthGuard } from '../auth/guards/auth.guard';
+import { AuditAccessService } from './providers/audit-access.service';
 
 @Controller('audit')
 @UseGuards(RateLimitGuard)
 export class AuditController {
-  constructor(private readonly auditService: AuditService) {}
+  constructor(
+    private readonly auditService: AuditService,
+    private readonly auditAccess: AuditAccessService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.ACCEPTED)
@@ -30,10 +33,14 @@ export class AuditController {
     @Body() createAuditDto: CreateAuditDto,
     @Req() request: Request,
   ) {
-    const audit = await this.auditService.create(
-      createAuditDto,
-      clientIdentifier(request),
-    );
+    const access = await this.auditAccess.authorize(request);
+    let audit;
+    try {
+      audit = await this.auditService.create(createAuditDto, access.clientId);
+    } catch (error) {
+      await this.auditAccess.release(access);
+      throw error;
+    }
 
     return {
       data: audit,

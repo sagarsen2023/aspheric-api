@@ -29,6 +29,7 @@ import { CrawlabilityCheck } from './checks/crawlability.check';
 import { DeliveryCheck } from './checks/delivery.check';
 import { LighthouseCheck } from './checks/lighthouse.check';
 import { AuthModule } from '../auth/auth.module';
+import { AuditAccessService } from './providers/audit-access.service';
 
 const CHECKS = [
   HeadersCheck,
@@ -80,6 +81,7 @@ const lighthouseRunnerProvider: Provider = {
     SiteFetcher,
     InflightLockService,
     RateLimitGuard,
+    AuditAccessService,
     PsiProvider,
     LocalLighthouseProvider,
     lighthouseRunnerProvider,

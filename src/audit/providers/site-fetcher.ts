@@ -19,7 +19,7 @@ const MAX_BODY_BYTES = 5 * 1024 * 1024;
 const DEFAULT_TIMEOUT = 20_000;
 
 const USER_AGENT =
-  'Mozilla/5.0 (compatible; AsphericReadinessBot/1.0; +https://aspheric.dev/bot)';
+  'Mozilla/5.0 (compatible; AsphericReadinessBot/1.0; +https://aspheric.app)';
 
 @Injectable()
 export class SiteFetcher {
@@ -49,11 +49,16 @@ export class SiteFetcher {
       const { url, addresses } = await assertSafeUrl(current);
       redirectChain.push(url.toString());
 
-      const address = addresses[0];
+      const entries = addresses.map((address) => ({
+        address,
+        family: isIP(address),
+      }));
       const dispatcher = new Agent({
         connect: {
-          lookup: (_hostname, _options, callback) =>
-            callback(null, address, isIP(address)),
+          lookup: (_hostname, options, callback) =>
+            options.all
+              ? callback(null, entries)
+              : callback(null, entries[0].address, entries[0].family),
         },
       });
 

@@ -1,17 +1,5 @@
 import { CheckResult } from '../types/audit.type';
 
-/**
- * Plain-language consequence copy, keyed by check id.
- *
- * Deliberately separate from `remediation`, which the checks build at run time
- * because it interpolates measured values ("TTFB was 1475ms"). Impact copy
- * never varies with the result, so storing these strings on every report would
- * bloat documents the entity already calls bulky, and would freeze the wording
- * of every report already inside the 30-day window. Merging on read means an
- * edit here reaches the whole backlog.
- *
- * Answers "what breaks if I ignore this", not "what do I type to fix it".
- */
 export const CHECK_IMPACT: Record<string, string> = {
   // Response headers
   'headers.hsts':
@@ -82,6 +70,8 @@ export const CHECK_IMPACT: Record<string, string> = {
     'Search engines cannot build rich results for you, so no star ratings, opening hours, prices or business panel beside your listing.',
   'seo.indexable':
     'The page is excluded from search results entirely. Nothing else in this report matters while that is true.',
+  'seo.icons':
+    'Search results and browser tabs show a generic globe instead of your logo, and a phone that saves the site to its home screen uses a blurry screenshot as the icon.',
   'seo.image-alt':
     'Screen reader users get no description of the image, and search engines cannot index it for image search.',
 
@@ -128,10 +118,8 @@ export const CHECK_IMPACT: Record<string, string> = {
     "Lighthouse's own estimate of the loading time you could recover from waste it can identify.",
 };
 
-/** What the API returns: a check result plus its static consequence copy. */
 export type EnrichedCheckResult = CheckResult & { impact?: string };
 
-/** Attaches impact copy to each result. An unknown id simply carries none. */
 export const withImpact = (checks: CheckResult[]): EnrichedCheckResult[] =>
   checks.map((check) => {
     const impact = CHECK_IMPACT[check.id];

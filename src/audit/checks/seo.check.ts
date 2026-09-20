@@ -7,13 +7,8 @@ import {
   CheckResult,
   CheckStatus,
 } from '../types/audit.type';
+import { SiteFetcher } from '../providers/site-fetcher';
 
-/**
- * Pulls every @type out of a JSON-LD block. Real-world markup is rarely a flat
- * object with a top-level @type: Next.js, Yoast and friends emit arrays, or a
- * single object wrapping an @graph of nodes. Reading only the root @type
- * reports "unknown" for most sites that are, in fact, marked up correctly.
- */
 export const extractSchemaTypes = (node: unknown): string[] => {
   if (Array.isArray(node)) return node.flatMap(extractSchemaTypes);
   if (!node || typeof node !== 'object') return [];
@@ -38,15 +33,57 @@ const TITLE_MIN = 10;
 const TITLE_MAX = 60;
 const DESCRIPTION_MIN = 50;
 const DESCRIPTION_MAX = 160;
+const ICON_PROBE_TIMEOUT = 8_000;
+
+export interface SiteIcons {
+  favicon: string | null;
+  appleTouchIcon: string | null;
+  manifest: string | null;
+}
+
+/** The icon and manifest links on a page, resolved against its URL. */
+export const findSiteIcons = (
+  $: cheerio.CheerioAPI,
+  pageUrl: string,
+): SiteIcons => {
+  const href = (selector: string) => {
+    const value = $(selector).first().attr('href')?.trim();
+    if (!value) return null;
+    try {
+      return new URL(value, pageUrl).toString();
+    } catch {
+      return null;
+    }
+  };
+
+  return {
+    favicon: href('link[rel~="icon" i]'),
+    appleTouchIcon: href(
+      'link[rel~="apple-touch-icon" i], link[rel~="apple-touch-icon-precomposed" i]',
+    ),
+    manifest: href('link[rel~="manifest" i]'),
+  };
+};
+
+interface FaviconProbe {
+  url: string;
+  declared: boolean;
+  loaded: boolean;
+  statusCode: number | null;
+}
 
 @Injectable()
 export class SeoCheck implements AuditCheck {
   readonly id = 'seo';
   readonly defaultCategory = AuditCategory.SEO;
 
+  constructor(private readonly fetcher: SiteFetcher) {}
+
   async run(context: AuditContext): Promise<CheckResult[]> {
     const $ = cheerio.load(context.response.body);
     const category = AuditCategory.SEO;
+    const icons = findSiteIcons($, context.response.finalUrl);
+    const favicon = await this.probeFavicon(icons.favicon, context.origin);
 
     const title = $('head title').first().text().trim();
     const description =
@@ -117,6 +154,7 @@ export class SeoCheck implements AuditCheck {
       }),
       this.headings(h1s, category),
       this.socialCards(openGraph, category),
+      this.siteIcons(icons, favicon, category),
       result({
         id: 'seo.structured-data',
         title: 'Structured data',
@@ -238,6 +276,110 @@ export class SeoCheck implements AuditCheck {
       evidence: { openGraph, missing },
       remediation:
         'Add og:title, og:description, og:image and og:url so links shared on social platforms render a preview card.',
+    });
+  }
+  /**
+   * Browsers fall back to /favicon.ico when a page links no icon, so that is
+   * what gets checked then. An HTML answer is a soft 404, not an icon.
+   */
+  private async probeFavicon(
+    declared: string | null,
+    origin: string,
+  ): Promise<FaviconProbe> {
+    const url = declared ?? `${origin}/favicon.ico`;
+    // Inline icons need no request. `data:,` is a deliberately empty icon.
+    if (url.startsWith('data:')) {
+      return {
+        url,
+        declared: true,
+        loaded: url.startsWith('data:image/'),
+        statusCode: null,
+      };
+    }
+
+    try {
+      const response = await this.fetcher.fetch(url, {
+        timeout: ICON_PROBE_TIMEOUT,
+      });
+      const contentType = response.headers['content-type'] ?? '';
+      return {
+        url,
+        declared: declared !== null,
+        loaded:
+          response.statusCode === 200 && !contentType.startsWith('text/html'),
+        statusCode: response.statusCode,
+      };
+    } catch {
+      return {
+        url,
+        declared: declared !== null,
+        loaded: false,
+        statusCode: null,
+      };
+    }
+  }
+
+  private siteIcons(
+    icons: SiteIcons,
+    favicon: FaviconProbe,
+    category: AuditCategory,
+  ): CheckResult {
+    const missing = [
+      icons.appleTouchIcon ? null : 'apple-touch-icon',
+      icons.manifest ? null : 'manifest',
+    ].filter((item): item is string => item !== null);
+
+    let status = CheckStatus.PASS;
+    let remediation =
+      'Your favicon, Apple touch icon and web app manifest are all in place.';
+
+    if (!favicon.loaded) {
+      status = CheckStatus.FAIL;
+      if (favicon.url.startsWith('data:')) {
+        remediation =
+          'The page sets an empty favicon, so browsers and search results show a generic icon. Link a real one with <link rel="icon" href="/favicon.svg" type="image/svg+xml">.';
+      } else if (favicon.declared) {
+        const reason =
+          favicon.statusCode === 200
+            ? 'returned a web page instead of an image'
+            : `did not load${favicon.statusCode ? ` (status ${favicon.statusCode})` : ''}`;
+        remediation = `The favicon linked from the page (${favicon.url}) ${reason}. Point <link rel="icon"> at an image file that exists.`;
+      } else {
+        remediation =
+          'Add a favicon: put a favicon.ico at the site root, or link one with <link rel="icon" href="/favicon.svg" type="image/svg+xml">.';
+      }
+    } else if (missing.length) {
+      status = CheckStatus.WARN;
+      remediation = [
+        icons.appleTouchIcon
+          ? null
+          : 'Add <link rel="apple-touch-icon" href="/apple-touch-icon.png"> with a 180×180 PNG for iPhone home screens.',
+        icons.manifest
+          ? null
+          : 'Add <link rel="manifest" href="/site.webmanifest"> listing 192×192 and 512×512 icons for Android.',
+      ]
+        .filter(Boolean)
+        .join(' ');
+    }
+
+    return result({
+      id: 'seo.icons',
+      title: 'Favicon and app icons',
+      category,
+      status,
+      weight: 1,
+      evidence: {
+        // An inline icon can be kilobytes long; its type is enough.
+        favicon: favicon.url.startsWith('data:')
+          ? `${favicon.url.split(',')[0]},…`
+          : favicon.url,
+        faviconLinked: favicon.declared,
+        faviconStatus: favicon.statusCode,
+        appleTouchIcon: icons.appleTouchIcon,
+        manifest: icons.manifest,
+        missing: favicon.loaded ? missing : ['favicon', ...missing],
+      },
+      remediation,
     });
   }
 }
