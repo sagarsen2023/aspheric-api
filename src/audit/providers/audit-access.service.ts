@@ -13,6 +13,7 @@ import { REDIS_CLIENT } from '../../redis/redis.provider';
 import { clientIdentifier } from './client-ip';
 
 const FREE_AUDIT_PREFIX = 'audit:free:';
+const FREE_AUDIT_WINDOW_SECONDS = 24 * 60 * 60;
 
 export interface AuditAccess {
   clientId: string;
@@ -40,7 +41,13 @@ export class AuditAccessService {
     const anonymousKey = `${FREE_AUDIT_PREFIX}${ipHash}`;
     let claimed: 'OK' | null;
     try {
-      claimed = await this.redis.set(anonymousKey, '1', 'NX');
+      claimed = await this.redis.set(
+        anonymousKey,
+        '1',
+        'EX',
+        FREE_AUDIT_WINDOW_SECONDS,
+        'NX',
+      );
     } catch {
       throw new ServiceUnavailableException(
         'Free website checks are temporarily unavailable. Please try again shortly.',
@@ -49,7 +56,7 @@ export class AuditAccessService {
 
     if (claimed !== 'OK') {
       throw new HttpException(
-        'This network has already used its free website check. Sign up to run more checks.',
+        'This network has already used its free website check for today. Try again after 24 hours or sign up to run more checks.',
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
