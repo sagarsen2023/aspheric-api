@@ -1,11 +1,12 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument } from 'mongoose';
+import mongoose, { HydratedDocument } from 'mongoose';
 import {
   AuditStatus,
   AuditStrategy,
   CategoryScore,
   CheckResult,
 } from '../types/audit.type';
+import { User } from '../../user/entities/user.entity';
 
 export type AuditDocument = HydratedDocument<Audit>;
 
@@ -65,9 +66,14 @@ export class Audit {
   @Prop({ type: Number, default: null })
   durationMs!: number | null;
 
-  /** Reports are bulky and go stale - drop them after 30 days. */
   @Prop({ default: Date.now, expires: THIRTY_DAYS })
   createdAt!: Date;
+
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: User.name,
+  })
+  createdBy?: mongoose.Types.ObjectId;
 }
 
 export const AuditSchema = SchemaFactory.createForClass(Audit).index({

@@ -10,7 +10,7 @@ import type { Request } from 'express';
 import type Redis from 'ioredis';
 import { AuthService } from '../../auth/auth.service';
 import { REDIS_CLIENT } from '../../redis/redis.provider';
-import { clientIdentifier } from './client-ip';
+import { OptionalAuthenticatedRequest } from '../../auth/types/params.type';
 
 const FREE_AUDIT_PREFIX = 'audit:free:';
 const FREE_AUDIT_WINDOW_SECONDS = 24 * 60 * 60;
@@ -27,15 +27,12 @@ export class AuditAccessService {
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
-  /** Authenticated users are identified by account; anonymous users get one IP-bound audit. */
-  async authorize(request: Request): Promise<AuditAccess> {
-    const token = this.bearerToken(request);
-    if (token) {
-      const user = await this.authService.validateToken(token);
-      return { clientId: `user:${user._id}` };
+  async authorize(request: OptionalAuthenticatedRequest): Promise<AuditAccess> {
+    if (request.user) {
+      return { clientId: `user:${request.user._id}` };
     }
 
-    const ip = clientIdentifier(request);
+    const ip = request.ip ?? request.socket.remoteAddress ?? 'unknown';
     const ipHash = createHash('sha256').update(ip).digest('hex');
 
     const anonymousKey = `${FREE_AUDIT_PREFIX}${ipHash}`;

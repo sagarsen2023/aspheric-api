@@ -21,6 +21,9 @@ import { AUDIT_JOB, AUDIT_QUEUE, AuditJobData } from './audit.constants';
 import { AuditStatus, AuditStrategy, CategoryScore } from './types/audit.type';
 import { withCategoryWeights } from './scoring/scoring.service';
 import { InflightLockService } from './providers/inflight-lock.service';
+import { normalizeUrl } from '../../utils/normalize-url';
+import { UserDocument } from '../user/entities/user.entity';
+import { UserRoles } from '../user/types/user.type';
 
 export type AuditReportResponse = Omit<
   FlattenMaps<Audit>,
@@ -33,15 +36,6 @@ export type AuditReportResponse = Omit<
 };
 
 export type AuditListItemResponse = Omit<AuditReportResponse, 'checks'>;
-
-/** Drops the fragment and lowercases the host so cache keys line up. */
-export const normalizeUrl = (input: string): string => {
-  const url = new URL(input);
-  url.hash = '';
-  url.hostname = url.hostname.toLowerCase();
-  if (url.pathname === '/') url.pathname = '';
-  return url.toString();
-};
 
 @Injectable()
 export class AuditService {
@@ -56,21 +50,19 @@ export class AuditService {
     private readonly config: ConfigType<typeof auditConfig>,
   ) {}
 
-  /**
-   * Validates the URL up front so an unreachable or private target is a 400 on
-   * this request rather than a failed job the caller has to poll for, then
-   * hands the slow part to the queue.
-   */
-  async create(
-    createAuditDto: CreateAuditDto,
-    clientId: string,
-  ): Promise<AuditDocument> {
+  async create({
+    createAuditDto,
+    clientId,
+    user,
+  }: {
+    createAuditDto: CreateAuditDto;
+    clientId: string;
+    user?: UserDocument;
+  }): Promise<AuditDocument> {
     const { url } = await assertSafeUrl(createAuditDto.url);
     const strategy = createAuditDto.strategy ?? AuditStrategy.MOBILE;
     const normalizedUrl = normalizeUrl(url.toString());
 
-    // Served from cache before taking the lock: returning an existing report
-    // costs nothing, so it should never be blocked by a running audit.
     if (!createAuditDto.refresh) {
       const cached = await this.findRecent(normalizedUrl, strategy);
       if (cached) return cached;
@@ -94,12 +86,18 @@ export class AuditService {
     }
 
     try {
+      const createdBy =
+        user?.role === UserRoles.USER
+          ? new Types.ObjectId(user._id)
+          : undefined;
+
       const audit = await this.auditModel.create({
         auditId,
         url: url.toString(),
         normalizedUrl,
         strategy,
         status: AuditStatus.QUEUED,
+        createdBy,
       });
 
       await this.auditQueue.add(
@@ -121,12 +119,10 @@ export class AuditService {
     }
   }
 
-  /** Called by the processor once a job will not be retried again. */
   async releaseInflight(lockKey: string, auditId: string): Promise<void> {
     await this.inflightLockService.release(lockKey, auditId);
   }
 
-  /** Runs the audit and records the outcome. Called by the queue processor. */
   async process(auditId: string): Promise<void> {
     const audit = await this.auditModel.findOne({ auditId });
     if (!audit) {
@@ -178,16 +174,10 @@ export class AuditService {
         },
       );
 
-      // Rethrow so BullMQ records the failure and applies its retry policy.
       throw error;
     }
   }
 
-  /**
-   * Returns a lean object rather than the document so the static impact copy
-   * can be merged in without persisting it - see check-impact.ts for why it is
-   * attached here instead of at check time.
-   */
   async findOne(auditId: string): Promise<AuditReportResponse> {
     const audit = await this.auditModel.findOne({ auditId }).lean();
     if (!audit) throw new NotFoundException(`No audit found for id ${auditId}`);
@@ -198,29 +188,33 @@ export class AuditService {
     };
   }
 
-  async findAll(
-    findAuditsDto: FindAuditsDto,
-  ): Promise<{ data: AuditListItemResponse[]; totalCount: number }> {
+  async findAll({
+    findAuditsDto,
+    user,
+  }: {
+    findAuditsDto: FindAuditsDto;
+    user?: UserDocument;
+  }): Promise<{ data: AuditListItemResponse[]; totalCount: number }> {
     const filter: Record<string, unknown> = {};
-
-    // TODO: Apply a query here that super admin can get all and other user can see what they have been done
 
     if (findAuditsDto.url) {
       try {
         filter.normalizedUrl = normalizeUrl(findAuditsDto.url);
       } catch {
-        // An unparseable filter matches nothing rather than erroring.
         filter.normalizedUrl = findAuditsDto.url;
       }
     }
     if (findAuditsDto.strategy) filter.strategy = findAuditsDto.strategy;
+
+    if (user?.role === UserRoles.USER) {
+      filter.createdBy = user._id.toString();
+    }
 
     const [data, totalCount] = await Promise.all([
       this.auditModel
         .find(filter)
         .sort({ createdAt: -1 })
         .limit(20)
-        // The full check list is large; the summary is enough for a listing.
         .select('-checks')
         .lean(),
       this.auditModel.countDocuments(filter),
@@ -235,7 +229,6 @@ export class AuditService {
     };
   }
 
-  /** Most recent completed audit still inside the cache window, if any. */
   private async findRecent(
     normalizedUrl: string,
     strategy: AuditStrategy,

@@ -35,9 +35,7 @@ export function forgotPasswordOtpTemplate(
         'We received a request to reset the password for your Aspheric Console account. Enter this code on the reset screen, then choose a new password.',
       ),
       codeBlock(otp),
-      mutedNote(
-        `${expiry} Never share it &mdash; Aspheric will never ask you for it.`,
-      ),
+      mutedNote(`${expiry} Never share it with others.`),
       mutedNote(
         'Didn&rsquo;t ask for a reset? Ignore this email and your password stays the same.',
       ),

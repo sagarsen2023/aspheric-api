@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument } from 'mongoose';
+import { User } from '../../user/entities/user.entity';
 
 export type AuthDocument = HydratedDocument<Auth>;
 
@@ -9,6 +10,7 @@ export type AuthDocument = HydratedDocument<Auth>;
 export class Auth {
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
+    ref: User.name,
   })
   userId!: mongoose.Types.ObjectId;
 

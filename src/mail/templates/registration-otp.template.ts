@@ -33,7 +33,7 @@ export function registrationOtpTemplate(
       ),
       codeBlock(otp),
       mutedNote(
-        `${expiry} Never share it &mdash; Aspheric will never ask you for it.`,
+        `${expiry} Never share it with others.`,
       ),
       mutedNote(
         'Didn&rsquo;t try to create an account? You can ignore this email. No account is created until the code is entered.',

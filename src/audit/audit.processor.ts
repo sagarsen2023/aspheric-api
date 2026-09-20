@@ -22,10 +22,6 @@ export class AuditProcessor extends WorkerHost {
     try {
       await this.auditService.process(auditId);
     } catch (error) {
-      // Hold the client's lock across a retry - the same audit is still in
-      // flight, so letting a new one in would break the one-at-a-time promise.
-      // Once no attempt remains, release it or the client stays blocked until
-      // the TTL expires.
       if (this.isFinalAttempt(job)) {
         await this.auditService.releaseInflight(lockKey, auditId);
       }

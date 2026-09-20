@@ -14,9 +14,13 @@ import { AuditService } from './audit.service';
 import { CreateAuditDto, FindAuditsDto } from './dto/audit.dto';
 import { RateLimit, RateLimitGuard } from './guards/rate-limit.guard';
 import { AuditStatus } from './types/audit.type';
-import type { Request } from 'express';
-import { AuthGuard } from '../auth/guards/auth.guard';
+import { AuthGuard, OptionalAuthGuard } from '../auth/guards/auth.guard';
 import { AuditAccessService } from './providers/audit-access.service';
+import type {
+  AuthenticatedRequest,
+  OptionalAuthenticatedRequest,
+} from '../auth/types/params.type';
+import { AuditDocument } from './entities/audit.entity';
 
 @Controller('audit')
 @UseGuards(RateLimitGuard)
@@ -28,15 +32,21 @@ export class AuditController {
 
   @Post()
   @HttpCode(HttpStatus.ACCEPTED)
+  @UseGuards(OptionalAuthGuard)
   @RateLimit({ limit: 5, windowSeconds: 60 })
   async create(
     @Body() createAuditDto: CreateAuditDto,
-    @Req() request: Request,
+    @Req() request: OptionalAuthenticatedRequest,
   ) {
+    let audit: AuditDocument;
     const access = await this.auditAccess.authorize(request);
-    let audit;
+
     try {
-      audit = await this.auditService.create(createAuditDto, access.clientId);
+      audit = await this.auditService.create({
+        createAuditDto,
+        clientId: access.clientId,
+        user: request.user,
+      });
     } catch (error) {
       await this.auditAccess.release(access);
       throw error;
@@ -46,7 +56,7 @@ export class AuditController {
       data: audit,
       message:
         audit.status === AuditStatus.COMPLETED
-          ? 'Returning a recent report for this URL. Send refresh=true to force a new run.'
+          ? 'Returning a recent report for this URL.'
           : `Audit queued. Poll GET /audit/${audit.auditId} for the report.`,
     };
   }
@@ -54,8 +64,11 @@ export class AuditController {
   @Get()
   @UseGuards(AuthGuard)
   @RateLimit({ limit: 60, windowSeconds: 60 })
-  findAll(@Query() findAuditsDto: FindAuditsDto) {
-    return this.auditService.findAll(findAuditsDto);
+  findAll(
+    @Req() req: AuthenticatedRequest,
+    @Query() findAuditsDto: FindAuditsDto,
+  ) {
+    return this.auditService.findAll({ findAuditsDto, user: req.user });
   }
 
   @Get(':auditId')

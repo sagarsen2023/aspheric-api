@@ -16,19 +16,18 @@ interface WelcomeTemplateData {
   name: string;
 }
 
-// How a review works, as published on the Aspheric landing page.
 const reviewSteps = [
   {
-    title: 'Upload your build',
-    body: 'Send the .aab or .ipa you were about to publish. We never ask for access to your repository.',
+    title: 'Check your website',
+    body: 'Run a readiness scan across key areas including security, performance, accessibility, SEO, and delivery.',
   },
   {
-    title: 'A reviewer reads it',
-    body: 'A person checks permissions, store-policy traps, business logic and whether your privacy policy matches what the app really does.',
+    title: 'Understand what needs attention',
+    body: 'Review clear, evidence-backed findings organized by category and severity, so you can focus on the issues that matter first.',
   },
   {
-    title: 'Get a clear verdict',
-    body: 'GO, FIX THESE or NO-GO in 2&ndash;3 working days, with a ranked fix list.',
+    title: 'Check your DPDP readiness',
+    body: 'Use the free DPDP readiness checker to understand your current data-protection posture and identify areas that may need improvement.',
   },
 ];
 
@@ -43,20 +42,21 @@ export function welcomeTemplate(
 
   const html = renderLayout(context, {
     subject,
-    preheader: 'Your account is ready. Here is how a build review works.',
+    preheader:
+      'Your account is ready. Continue your website and DPDP readiness journey.',
     eyebrow: 'Account created',
     title: first
       ? `Welcome to the console, ${escapeHtml(first)}`
       : 'Welcome to the console',
     content: [
       paragraph(
-        'Your account is ready. The Aspheric Console is where you send a build before it goes to the store &mdash; and where a clear answer comes back.',
+        'Your account is ready. The Aspheric Console is where you can continue your website readiness journey, review findings, and understand what needs attention next.',
       ),
       steps(reviewSteps),
       button(context.consoleUrl, 'Open the console &rarr;'),
       divider(),
       mutedNote(
-        `Not ready to send a build? The ${link(websiteCheckUrl, 'website readiness check')} is free, as often as you like.`,
+        `Want to check another website? Start with the ${link(websiteCheckUrl, 'free website readiness check')} and continue in the console when you are ready.`,
       ),
     ].join('\n'),
     footerNote:
@@ -66,16 +66,15 @@ export function welcomeTemplate(
   const text = renderText([
     first ? `Welcome to the console, ${first}` : 'Welcome to the console',
     '',
-    'Your account is ready. The Aspheric Console is where you send a build before it goes to the store - and where a clear answer comes back.',
+    'Your account is ready. The Aspheric Console is where you can continue your website readiness journey, review findings, and understand what needs attention next.',
     '',
     ...reviewSteps.map(
-      (step, index) =>
-        `${index + 1}. ${step.title}: ${step.body.replace(/&ndash;/g, '-')}`,
+      (step, index) => `${index + 1}. ${step.title}: ${step.body}`,
     ),
     '',
     `Open the console: ${context.consoleUrl}`,
     '',
-    `Not ready to send a build? The website readiness check is free, as often as you like: ${websiteCheckUrl}`,
+    `Want to check another website? Start with the free website readiness check and continue in the console when you are ready: ${websiteCheckUrl}`,
   ]);
 
   return { subject, html, text };

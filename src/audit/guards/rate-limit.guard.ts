@@ -9,7 +9,6 @@ import {
 import { Reflector } from '@nestjs/core';
 import { Request, Response } from 'express';
 import { RateLimiterService } from '../../redis/rate-limiter.service';
-import { clientIdentifier } from '../providers/client-ip';
 
 export interface RateLimitOptions {
   limit: number;
@@ -38,7 +37,7 @@ export class RateLimitGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     const response = context.switchToHttp().getResponse<Response>();
 
-    const identifier = clientIdentifier(request);
+    const identifier = request.ip ?? request.socket.remoteAddress ?? 'unknown';
     const key = `${context.getClass().name}:${context.getHandler().name}:${identifier}`;
     const result = await this.rateLimiter.hit(key, options);
 
