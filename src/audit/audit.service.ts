@@ -10,7 +10,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import type { ConfigType } from '@nestjs/config';
 import { auditConfig } from './audit.config';
 import { Queue } from 'bullmq';
-import { FlattenMaps, Model, Types } from 'mongoose';
+import { FlattenMaps, Model, QueryFilter, Types } from 'mongoose';
 import { randomUUID } from 'node:crypto';
 import { Audit, AuditDocument } from './entities/audit.entity';
 import { EnrichedCheckResult, withImpact } from './checks/check-impact';
@@ -24,6 +24,7 @@ import { InflightLockService } from './providers/inflight-lock.service';
 import { normalizeUrl } from '../../utils/normalize-url';
 import { UserDocument } from '../user/entities/user.entity';
 import { UserRoles } from '../user/types/user.type';
+import { escapeRegExp } from '../../utils/escape-regex-expressions';
 
 export type AuditReportResponse = Omit<
   FlattenMaps<Audit>,
@@ -195,14 +196,17 @@ export class AuditService {
     findAuditsDto: FindAuditsDto;
     user?: UserDocument;
   }): Promise<{ data: AuditListItemResponse[]; totalCount: number }> {
-    const filter: Record<string, unknown> = {};
+    const filter: QueryFilter<Audit> = {};
+    const { skip, limit } = findAuditsDto;
 
     if (findAuditsDto.url) {
+      let term: string;
       try {
-        filter.normalizedUrl = normalizeUrl(findAuditsDto.url);
+        term = normalizeUrl(findAuditsDto.url);
       } catch {
-        filter.normalizedUrl = findAuditsDto.url;
+        term = findAuditsDto.url;
       }
+      filter.normalizedUrl = { $regex: escapeRegExp(term), $options: 'i' };
     }
     if (findAuditsDto.strategy) filter.strategy = findAuditsDto.strategy;
 
@@ -214,7 +218,8 @@ export class AuditService {
       this.auditModel
         .find(filter)
         .sort({ createdAt: -1 })
-        .limit(20)
+        .skip(skip ?? 0)
+        .limit(limit ?? 10)
         .select('-checks')
         .lean(),
       this.auditModel.countDocuments(filter),

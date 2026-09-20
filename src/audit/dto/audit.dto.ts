@@ -9,6 +9,7 @@ import {
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { AuditStrategy } from '../types/audit.type';
+import { BasePaginationDto } from '../../common/dto/base-pagination.dto';
 
 export class CreateAuditDto {
   @IsUrl(
@@ -31,7 +32,7 @@ export class CreateAuditDto {
   refresh?: boolean;
 }
 
-export class FindAuditsDto {
+export class FindAuditsDto extends BasePaginationDto {
   @IsOptional()
   @IsString()
   @MaxLength(2048)
