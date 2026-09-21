@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
@@ -41,6 +42,7 @@ export type AuditListItemResponse = Omit<AuditReportResponse, 'checks'>;
 @Injectable()
 export class AuditService {
   private readonly logger = new Logger(AuditService.name);
+  private readonly auditUserPopulatedFields = 'name email';
 
   constructor(
     @InjectModel(Audit.name) private readonly auditModel: Model<Audit>,
@@ -221,6 +223,7 @@ export class AuditService {
         .skip(skip ?? 0)
         .limit(limit ?? 10)
         .select('-checks')
+        .populate('createdBy', this.auditUserPopulatedFields)
         .lean(),
       this.auditModel.countDocuments(filter),
     ]);
@@ -251,5 +254,37 @@ export class AuditService {
         createdAt: { $gte: new Date(Date.now() - ttlSeconds * 1000) },
       })
       .sort({ createdAt: -1 });
+  }
+
+  async assignAuditToPerson({
+    userId,
+    auditId,
+  }: {
+    auditId: string;
+    userId: Types.ObjectId;
+  }) {
+    const auditsByUser = await this.auditModel
+      .countDocuments({
+        createdBy: userId,
+      })
+      .populate('createdBy', this.auditUserPopulatedFields);
+
+    if (auditsByUser > 0) {
+      throw new BadRequestException(
+        'You cannot assign this audit with your account',
+      );
+    }
+
+    const audit = await this.auditModel.findOne({
+      auditId,
+    });
+
+    if (!audit) {
+      return;
+    }
+
+    audit.createdBy = userId;
+
+    return await audit.save();
   }
 }

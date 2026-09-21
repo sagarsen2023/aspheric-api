@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -21,6 +23,7 @@ import type {
   OptionalAuthenticatedRequest,
 } from '../auth/types/params.type';
 import { AuditDocument } from './entities/audit.entity';
+import { UserRoles } from '../user/types/user.type';
 
 @Controller('audit')
 @UseGuards(RateLimitGuard)
@@ -75,5 +78,20 @@ export class AuditController {
   @RateLimit({ limit: 120, windowSeconds: 60 })
   findOne(@Param('auditId') auditId: string) {
     return this.auditService.findOne(auditId);
+  }
+
+  @Patch(':auditId/assign')
+  @UseGuards(AuthGuard)
+  assignToUser(
+    @Req() request: AuthenticatedRequest,
+    @Param('auditId') auditId: string,
+  ) {
+    const user = request.user;
+
+    if (user.role !== UserRoles.USER) {
+      throw new ForbiddenException();
+    }
+
+    return this.auditService.assignAuditToPerson({ auditId, userId: user._id });
   }
 }
