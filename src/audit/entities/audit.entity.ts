@@ -7,10 +7,9 @@ import {
   CheckResult,
 } from '../types/audit.type';
 import { User } from '../../user/entities/user.entity';
+import { AUDIT_TTL_SECONDS, GRADE_NOT_AVAILABLE } from '../audit.constants';
 
 export type AuditDocument = HydratedDocument<Audit>;
-
-const THIRTY_DAYS = 2_592_000;
 
 @Schema({
   versionKey: false,
@@ -45,7 +44,7 @@ export class Audit {
   @Prop({ type: Number, default: null })
   score!: number | null;
 
-  @Prop({ default: 'N/A' })
+  @Prop({ default: GRADE_NOT_AVAILABLE })
   grade!: string;
 
   @Prop({ type: Array, default: [] })
@@ -66,7 +65,7 @@ export class Audit {
   @Prop({ type: Number, default: null })
   durationMs!: number | null;
 
-  @Prop({ default: Date.now, expires: THIRTY_DAYS })
+  @Prop({ default: Date.now, expires: AUDIT_TTL_SECONDS })
   createdAt!: Date;
 
   @Prop({

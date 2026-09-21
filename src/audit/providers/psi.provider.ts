@@ -15,11 +15,7 @@ import {
   RawLighthouseReport,
   normaliseReport,
 } from './lighthouse.provider';
-
-const PSI_ENDPOINT =
-  'https://www.googleapis.com/pagespeedonline/v5/runPagespeed';
-
-const CATEGORIES = ['performance', 'accessibility', 'best-practices', 'seo'];
+import { PSI_ENDPOINT, PSI_CATEGORIES } from '../audit.constants';
 
 interface PsiResponse {
   lighthouseResult?: RawLighthouseReport;
@@ -45,7 +41,7 @@ export class PsiProvider implements LighthouseRunner {
     const endpoint = new URL(PSI_ENDPOINT);
     endpoint.searchParams.set('url', url);
     endpoint.searchParams.set('strategy', strategy);
-    for (const category of CATEGORIES) {
+    for (const category of PSI_CATEGORIES) {
       endpoint.searchParams.append('category', category);
     }
     if (apiKey) endpoint.searchParams.set('key', apiKey);

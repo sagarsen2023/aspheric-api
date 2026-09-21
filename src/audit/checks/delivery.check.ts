@@ -6,18 +6,7 @@ import {
   CheckResult,
   CheckStatus,
 } from '../types/audit.type';
-
-const TTFB_GOOD = 800;
-const TTFB_POOR = 1_800;
-
-const CDN_SIGNATURES: Array<[string, RegExp]> = [
-  ['cloudflare', /cloudflare/i],
-  ['fastly', /fastly/i],
-  ['akamai', /akamai/i],
-  ['cloudfront', /cloudfront/i],
-  ['vercel', /vercel/i],
-  ['netlify', /netlify/i],
-];
+import { TTFB_GOOD, TTFB_POOR, CDN_SIGNATURES } from '../audit.constants';
 
 @Injectable()
 export class DeliveryCheck implements AuditCheck {

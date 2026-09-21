@@ -9,13 +9,12 @@ import {
 import { Reflector } from '@nestjs/core';
 import { Request, Response } from 'express';
 import { RateLimiterService } from '../../redis/rate-limiter.service';
+import { RATE_LIMIT_KEY } from '../audit.constants';
 
 export interface RateLimitOptions {
   limit: number;
   windowSeconds: number;
 }
-
-export const RATE_LIMIT_KEY = 'rate-limit-options';
 
 export const RateLimit = (options: RateLimitOptions) =>
   SetMetadata(RATE_LIMIT_KEY, options);

@@ -1,33 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
-
-/**
- * Blocks SSRF. We fetch URLs supplied by anonymous callers, so without this
- * the API is a proxy into whatever the server can reach - cloud metadata
- * endpoints (169.254.169.254), localhost services, the private VPC.
- *
- * Every hostname is resolved and *all* returned addresses are checked, and
- * the guard is re-run on each redirect hop (see SiteFetcher) because a public
- * host can 302 you straight to 127.0.0.1.
- */
-
-const BLOCKED_V4: Array<[string, number]> = [
-  ['0.0.0.0', 8], // "this" network
-  ['10.0.0.0', 8], // RFC1918 private
-  ['100.64.0.0', 10], // CGNAT
-  ['127.0.0.0', 8], // loopback
-  ['169.254.0.0', 16], // link-local / cloud metadata
-  ['172.16.0.0', 12], // RFC1918 private
-  ['192.0.0.0', 24], // IETF protocol assignments
-  ['192.0.2.0', 24], // TEST-NET-1
-  ['192.168.0.0', 16], // RFC1918 private
-  ['198.18.0.0', 15], // benchmarking
-  ['198.51.100.0', 24], // TEST-NET-2
-  ['203.0.113.0', 24], // TEST-NET-3
-  ['224.0.0.0', 4], // multicast
-  ['240.0.0.0', 4], // reserved
-];
+import { BLOCKED_V4 } from '../audit.constants';
 
 const toInt = (ip: string): number =>
   ip.split('.').reduce((acc, octet) => (acc << 8) + Number(octet), 0) >>> 0;
@@ -43,7 +17,6 @@ const isBlockedV4 = (ip: string): boolean => {
 const isBlockedV6 = (ip: string): boolean => {
   const address = ip.toLowerCase().split('%')[0];
 
-  // IPv4-mapped (::ffff:127.0.0.1) smuggles a v4 address through a v6 literal.
   const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(address);
   if (mapped) return isBlockedV4(mapped[1]);
 
@@ -67,10 +40,6 @@ export interface SafeUrl {
   addresses: string[];
 }
 
-/**
- * Throws unless `input` is an http(s) URL that resolves exclusively to public
- * addresses. Returns the parsed URL plus the resolved IPs.
- */
 export const assertSafeUrl = async (input: string): Promise<SafeUrl> => {
   let url: URL;
   try {
@@ -112,8 +81,6 @@ export const assertSafeUrl = async (input: string): Promise<SafeUrl> => {
     throw new BadRequestException(`Host did not resolve: ${hostname}`);
   }
 
-  // Every address must be public. One private answer in a round-robin set is
-  // enough for an attacker to eventually get routed there.
   const blocked = resolved.find((entry) => isBlockedAddress(entry.address));
   if (blocked) {
     throw new BadRequestException(

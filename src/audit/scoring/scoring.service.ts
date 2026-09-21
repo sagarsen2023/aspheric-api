@@ -7,38 +7,15 @@ import {
   CheckResult,
   CheckStatus,
 } from '../types/audit.type';
-
-/**
- * How much each category contributes to the overall readiness score. Security
- * and performance dominate because they are the two that actually stop a site
- * from being production-ready.
- */
-const CATEGORY_WEIGHTS: Record<AuditCategory, number> = {
-  [AuditCategory.SECURITY]: 3,
-  [AuditCategory.PERFORMANCE]: 3,
-  [AuditCategory.ACCESSIBILITY]: 2,
-  [AuditCategory.SEO]: 2,
-  [AuditCategory.DELIVERY]: 1.5,
-  [AuditCategory.CRAWLABILITY]: 1,
-};
-
-/**
- * Below this share of a category's weight, the surviving checks are too thin a
- * basis for the score to mean much - e.g. "accessibility 100" resting on an
- * image-alt check alone because Lighthouse was unavailable.
- */
-const MIN_RELIABLE_COVERAGE = 0.5;
-
-const GRADES: Array<[number, string]> = [
-  [90, 'A'],
-  [80, 'B'],
-  [70, 'C'],
-  [60, 'D'],
-  [0, 'F'],
-];
+import {
+  CATEGORY_WEIGHTS,
+  GRADE_NOT_AVAILABLE,
+  GRADES,
+  MIN_RELIABLE_COVERAGE,
+} from '../audit.constants';
 
 export const gradeFor = (score: number | null): string => {
-  if (score === null) return 'N/A';
+  if (score === null) return GRADE_NOT_AVAILABLE;
   return GRADES.find(([threshold]) => score >= threshold)?.[1] ?? 'F';
 };
 

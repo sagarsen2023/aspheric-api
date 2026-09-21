@@ -87,3 +87,10 @@ export interface AuditContext {
     redirectChain: string[];
   };
 }
+
+export interface AuditAnalyticsResponse {
+  from: Date;
+  to: Date;
+  totalChecks: number;
+  gradeDistribution: Array<{ grade: string; count: number }>;
+}

@@ -6,82 +6,17 @@ import {
   CheckResult,
   CheckStatus,
 } from '../types/audit.type';
-import { LIGHTHOUSE_RUNNER } from '../providers/lighthouse.provider';
 import type {
   LighthouseRunResult,
   LighthouseRunner,
 } from '../providers/lighthouse.provider';
-
-/** Lighthouse's own thresholds: >=0.9 green, >=0.5 orange, below that red. */
-const GOOD = 0.9;
-const AVERAGE = 0.5;
-
-const CATEGORY_MAP: Array<{
-  lighthouseId: string;
-  category: AuditCategory;
-  title: string;
-  weight: number;
-}> = [
-  {
-    lighthouseId: 'performance',
-    category: AuditCategory.PERFORMANCE,
-    title: 'Lighthouse performance',
-    weight: 5,
-  },
-  {
-    lighthouseId: 'accessibility',
-    category: AuditCategory.ACCESSIBILITY,
-    title: 'Lighthouse accessibility',
-    weight: 5,
-  },
-  {
-    lighthouseId: 'best-practices',
-    category: AuditCategory.SECURITY,
-    title: 'Lighthouse best practices',
-    weight: 2,
-  },
-  {
-    lighthouseId: 'seo',
-    category: AuditCategory.SEO,
-    title: 'Lighthouse SEO',
-    weight: 3,
-  },
-];
-
-/** Core Web Vitals "good" thresholds, per web.dev. */
-const VITALS: Array<{
-  key: keyof LighthouseRunResult['metrics'];
-  id: string;
-  title: string;
-  good: number;
-  poor: number;
-  unit: string;
-}> = [
-  {
-    key: 'lcp',
-    id: 'lighthouse.lcp',
-    title: 'Largest Contentful Paint',
-    good: 2500,
-    poor: 4000,
-    unit: 'ms',
-  },
-  {
-    key: 'cls',
-    id: 'lighthouse.cls',
-    title: 'Cumulative Layout Shift',
-    good: 0.1,
-    poor: 0.25,
-    unit: '',
-  },
-  {
-    key: 'tbt',
-    id: 'lighthouse.tbt',
-    title: 'Total Blocking Time',
-    good: 200,
-    poor: 600,
-    unit: 'ms',
-  },
-];
+import {
+  LIGHTHOUSE_SCORE_GOOD,
+  LIGHTHOUSE_SCORE_AVERAGE,
+  LIGHTHOUSE_CATEGORY_MAP,
+  LIGHTHOUSE_RUNNER,
+  LIGHTHOUSE_VITALS,
+} from '../audit.constants';
 
 @Injectable()
 export class LighthouseCheck implements AuditCheck {
@@ -104,9 +39,7 @@ export class LighthouseCheck implements AuditCheck {
       const reason = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Lighthouse unavailable for ${context.url}: ${reason}`);
 
-      // A Lighthouse outage should degrade the report, not fail the audit -
-      // skipped checks are excluded from scoring rather than counted as zero.
-      return CATEGORY_MAP.map((entry) =>
+      return LIGHTHOUSE_CATEGORY_MAP.map((entry) =>
         result({
           id: `lighthouse.${entry.lighthouseId}`,
           title: entry.title,
@@ -126,7 +59,7 @@ export class LighthouseCheck implements AuditCheck {
   }
 
   private categoryResults(report: LighthouseRunResult): CheckResult[] {
-    return CATEGORY_MAP.map((entry) => {
+    return LIGHTHOUSE_CATEGORY_MAP.map((entry) => {
       const score = report.categories[entry.lighthouseId];
 
       if (score === null || score === undefined) {
@@ -141,8 +74,8 @@ export class LighthouseCheck implements AuditCheck {
       }
 
       let status = CheckStatus.FAIL;
-      if (score >= GOOD) status = CheckStatus.PASS;
-      else if (score >= AVERAGE) status = CheckStatus.WARN;
+      if (score >= LIGHTHOUSE_SCORE_GOOD) status = CheckStatus.PASS;
+      else if (score >= LIGHTHOUSE_SCORE_AVERAGE) status = CheckStatus.WARN;
 
       return result({
         id: `lighthouse.${entry.lighthouseId}`,
@@ -166,7 +99,7 @@ export class LighthouseCheck implements AuditCheck {
   }
 
   private vitalResults(report: LighthouseRunResult): CheckResult[] {
-    return VITALS.map((vital) => {
+    return LIGHTHOUSE_VITALS.map((vital) => {
       const value = report.metrics[vital.key];
 
       if (value === null) {

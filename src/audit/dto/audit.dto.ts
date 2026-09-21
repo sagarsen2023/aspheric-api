@@ -1,15 +1,18 @@
 import {
   IsBoolean,
+  IsDate,
   IsEnum,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
   IsUrl,
   MaxLength,
 } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { AuditStrategy } from '../types/audit.type';
 import { BasePaginationDto } from '../../common/dto/base-pagination.dto';
+import { AUDIT_GRADES } from '../audit.constants';
 
 export class CreateAuditDto {
   @IsUrl(
@@ -41,4 +44,25 @@ export class FindAuditsDto extends BasePaginationDto {
   @IsOptional()
   @IsEnum(AuditStrategy)
   strategy?: AuditStrategy;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.toUpperCase() : value,
+  )
+  @IsIn(AUDIT_GRADES)
+  grade?: string;
+}
+
+export class AuditAnalyticsDto {
+  /** Start of the range (ISO date). Defaults to 30 days before `to`. */
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  from?: Date;
+
+  /** End of the range (ISO date). Defaults to now. */
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  to?: Date;
 }

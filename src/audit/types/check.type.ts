@@ -4,26 +4,14 @@ import {
   CheckResult,
   CheckStatus,
 } from './audit.type';
-
-/** DI token for the array of every registered check. */
-export const AUDIT_CHECKS = Symbol('AUDIT_CHECKS');
+import { DEFAULT_CHECK_SCORE } from '../audit.constants';
 
 export interface AuditCheck {
-  /** Stable identifier, also used to namespace the results it emits. */
   readonly id: string;
-  /** Where a failure of the check itself gets reported. */
   readonly defaultCategory: AuditCategory;
-  /** How long this check may take before the runner gives up on it. */
   readonly timeout?: number;
   run(context: AuditContext): Promise<CheckResult[]>;
 }
-
-const DEFAULT_SCORE: Record<CheckStatus, number> = {
-  [CheckStatus.PASS]: 1,
-  [CheckStatus.WARN]: 0.5,
-  [CheckStatus.FAIL]: 0,
-  [CheckStatus.SKIPPED]: 0,
-};
 
 /** Builds a CheckResult, defaulting `score` from `status`. */
 export const result = (input: {
@@ -37,7 +25,7 @@ export const result = (input: {
   remediation?: string;
 }): CheckResult => ({
   weight: 1,
-  score: DEFAULT_SCORE[input.status],
+  score: DEFAULT_CHECK_SCORE[input.status],
   ...input,
 });
 

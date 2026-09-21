@@ -6,18 +6,7 @@ import {
   CheckResult,
   CheckStatus,
 } from '../types/audit.type';
-
-/** Six months, the minimum max-age hstspreload.org will accept. */
-const HSTS_MIN_AGE = 15_768_000;
-
-const LEAKY_HEADERS = [
-  'server',
-  'x-powered-by',
-  'x-aspnet-version',
-  'x-aspnetmvc-version',
-  'x-generator',
-  'x-drupal-cache',
-];
+import { HSTS_MIN_AGE, LEAKY_HEADERS } from '../audit.constants';
 
 @Injectable()
 export class HeadersCheck implements AuditCheck {

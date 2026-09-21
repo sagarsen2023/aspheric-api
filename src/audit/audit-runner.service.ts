@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { AUDIT_CHECKS, AuditCheck, result } from './types/check.type';
+import { AuditCheck, result } from './types/check.type';
 import { SiteFetcher } from './providers/site-fetcher';
 import { assertSafeUrl } from './providers/url-guard';
 import { ScoringService } from './scoring/scoring.service';
@@ -10,8 +10,7 @@ import {
   CheckResult,
   CheckStatus,
 } from './types/audit.type';
-
-const DEFAULT_CHECK_TIMEOUT = 30_000;
+import { AUDIT_CHECKS, DEFAULT_CHECK_TIMEOUT } from './audit.constants';
 
 const withTimeout = <T>(
   promise: Promise<T>,

@@ -9,17 +9,19 @@ import { AuditProcessor } from './audit.processor';
 import { AuditRunnerService } from './audit-runner.service';
 import { ScoringService } from './scoring/scoring.service';
 import { Audit, AuditSchema } from './entities/audit.entity';
-import { AUDIT_QUEUE } from './audit.constants';
-import { AUDIT_CHECKS, AuditCheck } from './types/check.type';
+import { AuditCheck } from './types/check.type';
 import { SiteFetcher } from './providers/site-fetcher';
 import { InflightLockService } from './providers/inflight-lock.service';
 import { redisConnectionOptions } from '../redis/redis.provider';
 import { RateLimitGuard } from './guards/rate-limit.guard';
-import { LIGHTHOUSE_RUNNER } from './providers/lighthouse.provider';
+import {
+  AUDIT_QUEUE,
+  AUDIT_CHECKS,
+  LIGHTHOUSE_RUNNER,
+} from './audit.constants';
 import { PsiProvider } from './providers/psi.provider';
 import { LocalLighthouseProvider } from './providers/local-lighthouse.provider';
 import { LighthouseProvider } from './types/audit.type';
-
 import { HeadersCheck } from './checks/headers.check';
 import { TlsCheck } from './checks/tls.check';
 import { CookiesCheck } from './checks/cookies.check';

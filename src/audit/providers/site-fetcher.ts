@@ -2,6 +2,12 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { assertSafeUrl } from './url-guard';
 import { Agent } from 'undici';
 import { isIP } from 'node:net';
+import {
+  FETCH_MAX_REDIRECTS,
+  FETCH_MAX_BODY_BYTES,
+  FETCH_DEFAULT_TIMEOUT,
+  FETCH_USER_AGENT,
+} from '../audit.constants';
 
 export interface FetchResult {
   finalUrl: string;
@@ -13,13 +19,6 @@ export interface FetchResult {
   totalTime: number;
   redirectChain: string[];
 }
-
-const MAX_REDIRECTS = 5;
-const MAX_BODY_BYTES = 5 * 1024 * 1024;
-const DEFAULT_TIMEOUT = 20_000;
-
-const USER_AGENT =
-  'Mozilla/5.0 (compatible; AsphericReadinessBot/1.0; +https://aspheric.app)';
 
 @Injectable()
 export class SiteFetcher {
@@ -36,7 +35,7 @@ export class SiteFetcher {
   ): Promise<FetchResult> {
     const {
       method = 'GET',
-      timeout = DEFAULT_TIMEOUT,
+      timeout = FETCH_DEFAULT_TIMEOUT,
       readBody = true,
       headers: extraHeaders = {},
     } = options;
@@ -45,7 +44,7 @@ export class SiteFetcher {
     let current = input;
     const startedAt = Date.now();
 
-    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    for (let hop = 0; hop <= FETCH_MAX_REDIRECTS; hop++) {
       const { url, addresses } = await assertSafeUrl(current);
       redirectChain.push(url.toString());
 
@@ -72,7 +71,7 @@ export class SiteFetcher {
           redirect: 'manual',
           signal: controller.signal,
           headers: {
-            'user-agent': USER_AGENT,
+            'user-agent': FETCH_USER_AGENT,
             accept:
               'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'accept-language': 'en-US,en;q=0.9',
@@ -96,9 +95,9 @@ export class SiteFetcher {
         clearTimeout(timer);
         await response.body?.cancel().catch(() => undefined);
         await dispatcher.close().catch(() => undefined);
-        if (hop === MAX_REDIRECTS) {
+        if (hop === FETCH_MAX_REDIRECTS) {
           throw new BadRequestException(
-            `Too many redirects (>${MAX_REDIRECTS}) starting at ${input}`,
+            `Too many redirects (>${FETCH_MAX_REDIRECTS}) starting at ${input}`,
           );
         }
         current = new URL(location, url).toString();
@@ -144,7 +143,7 @@ export class SiteFetcher {
         if (!value) continue;
         chunks.push(value);
         received += value.byteLength;
-        if (received >= MAX_BODY_BYTES) {
+        if (received >= FETCH_MAX_BODY_BYTES) {
           controller.abort();
           break;
         }

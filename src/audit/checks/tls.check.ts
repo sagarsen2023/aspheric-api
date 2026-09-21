@@ -8,6 +8,11 @@ import {
   CheckStatus,
 } from '../types/audit.type';
 import { SiteFetcher } from '../providers/site-fetcher';
+import {
+  TLS_HANDSHAKE_TIMEOUT,
+  TLS_REDIRECT_PROBE_TIMEOUT,
+  DAY_MS,
+} from '../audit.constants';
 
 interface TlsFacts {
   protocol: string | null;
@@ -21,10 +26,6 @@ interface TlsFacts {
   daysRemaining: number;
   subjectAltNames?: string;
 }
-
-const HANDSHAKE_TIMEOUT = 10_000;
-const REDIRECT_PROBE_TIMEOUT = 8_000;
-const DAY = 24 * 60 * 60 * 1000;
 
 /** Certificate subject fields are `string | string[]` for repeated RDNs. */
 const firstValue = (field: string | string[] | undefined): string => {
@@ -94,24 +95,16 @@ export class TlsCheck implements AuditCheck {
     });
   }
 
-  /**
-   * Confirms plain HTTP is redirected to HTTPS. This has to make its own
-   * http:// request: callers almost always submit the https URL, so inspecting
-   * the audited response would pass every site that merely *has* TLS, without
-   * ever proving that the insecure entry point is closed.
-   */
   private async httpsRedirect(context: AuditContext): Promise<CheckResult> {
     const probeUrl = `http://${context.hostname}/`;
 
     let response: Awaited<ReturnType<SiteFetcher['fetch']>>;
     try {
       response = await this.fetcher.fetch(probeUrl, {
-        timeout: REDIRECT_PROBE_TIMEOUT,
+        timeout: TLS_REDIRECT_PROBE_TIMEOUT,
         readBody: false,
       });
     } catch (error) {
-      // A refused connection on port 80 is a legitimate way to have no
-      // insecure entry point at all, so this is not a failure.
       return result({
         id: 'tls.https-redirect',
         title: 'HTTP redirects to HTTPS',
@@ -219,7 +212,7 @@ export class TlsCheck implements AuditCheck {
           // We want to inspect an untrusted cert, not refuse it - the
           // `authorized` flag below is what the check actually reports.
           rejectUnauthorized: false,
-          timeout: HANDSHAKE_TIMEOUT,
+          timeout: TLS_HANDSHAKE_TIMEOUT,
         },
         () => {
           const certificate: PeerCertificate = socket.getPeerCertificate();
@@ -240,7 +233,7 @@ export class TlsCheck implements AuditCheck {
             subject: firstValue(certificate.subject?.CN),
             subjectAltNames: certificate.subjectaltname,
             daysRemaining: validTo
-              ? Math.floor((validTo.getTime() - Date.now()) / DAY)
+              ? Math.floor((validTo.getTime() - Date.now()) / DAY_MS)
               : -1,
           });
           socket.end();
@@ -255,7 +248,7 @@ export class TlsCheck implements AuditCheck {
       socket.once('timeout', () => {
         socket.destroy();
         reject(
-          new Error(`TLS handshake timed out after ${HANDSHAKE_TIMEOUT}ms`),
+          new Error(`TLS handshake timed out after ${TLS_HANDSHAKE_TIMEOUT}ms`),
         );
       });
     });

@@ -1,14 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type Redis from 'ioredis';
 import { REDIS_CLIENT } from '../../redis/redis.provider';
-
-const RELEASE_SCRIPT = `
-if redis.call("get", KEYS[1]) == ARGV[1] then
-  return redis.call("del", KEYS[1])
-else
-  return 0
-end
-`;
+import { INFLIGHT_LOCK_RELEASE_SCRIPT } from '../audit.constants';
 
 export interface AcquireResult {
   acquired: boolean;
@@ -48,7 +41,7 @@ export class InflightLockService {
 
   async release(key: string, value: string): Promise<void> {
     try {
-      await this.redis.eval(RELEASE_SCRIPT, 1, key, value);
+      await this.redis.eval(INFLIGHT_LOCK_RELEASE_SCRIPT, 1, key, value);
     } catch (error) {
       this.logger.warn(
         `Could not release in-flight lock ${key}: ${

@@ -1,15 +1,10 @@
 import { AuditStrategy, LighthouseProvider } from '../types/audit.type';
 
 export interface LighthouseMetrics {
-  /** Largest Contentful Paint, ms. */
   lcp: number | null;
-  /** Cumulative Layout Shift, unitless. */
   cls: number | null;
-  /** Total Blocking Time, ms. */
   tbt: number | null;
-  /** First Contentful Paint, ms. */
   fcp: number | null;
-  /** Speed Index, ms. */
   speedIndex: number | null;
 }
 
@@ -21,15 +16,12 @@ export interface LighthouseOpportunity {
 
 export interface LighthouseRunResult {
   provider: LighthouseProvider;
-  /** Category id -> 0-1 score, exactly as Lighthouse reports it. */
+
   categories: Record<string, number | null>;
   metrics: LighthouseMetrics;
   opportunities: LighthouseOpportunity[];
   fetchedUrl: string;
 }
-
-/** DI token for whichever runner the config selected. */
-export const LIGHTHOUSE_RUNNER = Symbol('LIGHTHOUSE_RUNNER');
 
 export interface LighthouseRunner {
   readonly provider: LighthouseProvider;
@@ -56,7 +48,6 @@ export interface RawLighthouseReport {
 const metric = (report: RawLighthouseReport, id: string): number | null =>
   report.audits?.[id]?.numericValue ?? null;
 
-/** Normalises a raw Lighthouse report into our provider-agnostic shape. */
 export const normaliseReport = (
   report: RawLighthouseReport,
   provider: LighthouseProvider,

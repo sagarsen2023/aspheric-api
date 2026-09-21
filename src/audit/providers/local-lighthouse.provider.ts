@@ -18,16 +18,8 @@ import {
   RawLighthouseReport,
   normaliseReport,
 } from './lighthouse.provider';
+import { CHROME_FLAGS, DESKTOP_SCREEN } from '../audit.constants';
 
-/**
- * `lighthouse` and `chrome-launcher` are ESM-only and declared as optional
- * dependencies, so they must not be resolved at build time - a deployment that
- * only ever uses the PSI provider should not need them installed at all.
- *
- * The indirection through `new Function` keeps TypeScript from rewriting this
- * into a `require()` call (which cannot load ESM) and from type-resolving a
- * package that may be absent.
- */
 const dynamicImport = new Function(
   'specifier',
   'return import(specifier);',
@@ -49,27 +41,6 @@ type LighthouseFn = (
   config?: Record<string, unknown>,
 ) => Promise<{ lhr: RawLighthouseReport } | undefined>;
 
-const CHROME_FLAGS = [
-  '--headless=new',
-  '--no-sandbox', // required in most container runtimes
-  '--disable-gpu',
-  '--disable-dev-shm-usage', // /dev/shm is tiny in Docker; avoids crashes
-  '--disable-extensions',
-];
-
-const DESKTOP_SCREEN = {
-  mobile: false,
-  width: 1350,
-  height: 940,
-  deviceScaleFactor: 1,
-  disabled: false,
-};
-
-/**
- * Runs Lighthouse in-process against a headless Chrome. Works on internal and
- * staging URLs and has no external quota, but needs a Chrome binary on the host
- * and roughly 1GB of RAM per concurrent run.
- */
 @Injectable()
 export class LocalLighthouseProvider implements LighthouseRunner {
   readonly provider = LighthouseProvider.LOCAL;

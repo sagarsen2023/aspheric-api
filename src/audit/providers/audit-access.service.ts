@@ -11,9 +11,10 @@ import type Redis from 'ioredis';
 import { AuthService } from '../../auth/auth.service';
 import { REDIS_CLIENT } from '../../redis/redis.provider';
 import { OptionalAuthenticatedRequest } from '../../auth/types/params.type';
-
-const FREE_AUDIT_PREFIX = 'audit:free:';
-const FREE_AUDIT_WINDOW_SECONDS = 24 * 60 * 60;
+import {
+  FREE_AUDIT_PREFIX,
+  FREE_AUDIT_WINDOW_SECONDS,
+} from '../audit.constants';
 
 export interface AuditAccess {
   clientId: string;

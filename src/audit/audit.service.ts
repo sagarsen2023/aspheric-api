@@ -15,11 +15,28 @@ import { FlattenMaps, Model, QueryFilter, Types } from 'mongoose';
 import { randomUUID } from 'node:crypto';
 import { Audit, AuditDocument } from './entities/audit.entity';
 import { EnrichedCheckResult, withImpact } from './checks/check-impact';
-import { CreateAuditDto, FindAuditsDto } from './dto/audit.dto';
+import {
+  AuditAnalyticsDto,
+  CreateAuditDto,
+  FindAuditsDto,
+} from './dto/audit.dto';
 import { AuditRunnerService } from './audit-runner.service';
 import { assertSafeUrl } from './providers/url-guard';
-import { AUDIT_JOB, AUDIT_QUEUE, AuditJobData } from './audit.constants';
-import { AuditStatus, AuditStrategy, CategoryScore } from './types/audit.type';
+import {
+  ANALYTICS_DEFAULT_RANGE_DAYS,
+  AUDIT_GRADES,
+  AUDIT_JOB,
+  AUDIT_QUEUE,
+  AUDIT_USER_POPULATED_FIELDS,
+  AuditJobData,
+  DAY_MS,
+} from './audit.constants';
+import {
+  AuditAnalyticsResponse,
+  AuditStatus,
+  AuditStrategy,
+  CategoryScore,
+} from './types/audit.type';
 import { withCategoryWeights } from './scoring/scoring.service';
 import { InflightLockService } from './providers/inflight-lock.service';
 import { normalizeUrl } from '../../utils/normalize-url';
@@ -42,7 +59,6 @@ export type AuditListItemResponse = Omit<AuditReportResponse, 'checks'>;
 @Injectable()
 export class AuditService {
   private readonly logger = new Logger(AuditService.name);
-  private readonly auditUserPopulatedFields = 'name email';
 
   constructor(
     @InjectModel(Audit.name) private readonly auditModel: Model<Audit>,
@@ -211,6 +227,7 @@ export class AuditService {
       filter.normalizedUrl = { $regex: escapeRegExp(term), $options: 'i' };
     }
     if (findAuditsDto.strategy) filter.strategy = findAuditsDto.strategy;
+    if (findAuditsDto.grade) filter.grade = findAuditsDto.grade;
 
     if (user?.role === UserRoles.USER) {
       filter.createdBy = user._id.toString();
@@ -223,7 +240,7 @@ export class AuditService {
         .skip(skip ?? 0)
         .limit(limit ?? 10)
         .select('-checks')
-        .populate('createdBy', this.auditUserPopulatedFields)
+        .populate('createdBy', AUDIT_USER_POPULATED_FIELDS)
         .lean(),
       this.auditModel.countDocuments(filter),
     ]);
@@ -234,6 +251,68 @@ export class AuditService {
         categories: withCategoryWeights(audit.categories),
       })),
       totalCount,
+    };
+  }
+
+  async getAnalytics({
+    auditAnalyticsDto,
+    user,
+  }: {
+    auditAnalyticsDto: AuditAnalyticsDto;
+    user: UserDocument;
+  }): Promise<AuditAnalyticsResponse> {
+    const to = auditAnalyticsDto.to ?? new Date();
+    const from =
+      auditAnalyticsDto.from ??
+      new Date(to.getTime() - ANALYTICS_DEFAULT_RANGE_DAYS * DAY_MS);
+
+    if (from > to) {
+      throw new BadRequestException('"from" must be on or before "to"');
+    }
+
+    const match: QueryFilter<Audit> = {
+      createdAt: { $gte: from, $lte: to },
+    };
+
+    const canSeeAll = [UserRoles.ADMIN, UserRoles.SUPER_ADMIN].includes(
+      user.role,
+    );
+    if (!canSeeAll) {
+      match.createdBy = new Types.ObjectId(user._id);
+    }
+
+    const [{ totalChecks = 0, grades = [] } = {}] =
+      await this.auditModel.aggregate<{
+        totalChecks: number;
+        grades: Array<{ _id: string; count: number }>;
+      }>([
+        { $match: match },
+        {
+          $facet: {
+            totalChecks: [{ $count: 'count' }],
+            grades: [{ $group: { _id: '$grade', count: { $sum: 1 } } }],
+          },
+        },
+        {
+          $project: {
+            totalChecks: {
+              $ifNull: [{ $arrayElemAt: ['$totalChecks.count', 0] }, 0],
+            },
+            grades: 1,
+          },
+        },
+      ]);
+
+    const counts = new Map(grades.map(({ _id, count }) => [_id, count]));
+
+    return {
+      from,
+      to,
+      totalChecks,
+      gradeDistribution: AUDIT_GRADES.map((grade) => ({
+        grade,
+        count: counts.get(grade) ?? 0,
+      })),
     };
   }
 
@@ -267,7 +346,7 @@ export class AuditService {
       .countDocuments({
         createdBy: userId,
       })
-      .populate('createdBy', this.auditUserPopulatedFields);
+      .populate('createdBy', AUDIT_USER_POPULATED_FIELDS);
 
     if (auditsByUser > 0) {
       throw new BadRequestException(

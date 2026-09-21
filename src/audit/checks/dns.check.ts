@@ -7,15 +7,8 @@ import {
   CheckResult,
   CheckStatus,
 } from '../types/audit.type';
+import { DNS_RESOLVE_TIMEOUT } from '../audit.constants';
 
-const RESOLVE_TIMEOUT = 5_000;
-
-/**
- * Email-spoofing and certificate-issuance controls. These live in DNS rather
- * than in the HTTP response, so they are invisible to Lighthouse - but a
- * domain without DMARC is trivially spoofable in phishing mail, which is very
- * much a production-readiness problem.
- */
 @Injectable()
 export class DnsCheck implements AuditCheck {
   readonly id = 'dns';
@@ -88,7 +81,7 @@ export class DnsCheck implements AuditCheck {
   }
 
   private resolver(): Resolver {
-    const resolver = new Resolver({ timeout: RESOLVE_TIMEOUT, tries: 2 });
+    const resolver = new Resolver({ timeout: DNS_RESOLVE_TIMEOUT, tries: 2 });
     return resolver;
   }
 

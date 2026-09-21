@@ -8,6 +8,13 @@ import {
   CheckStatus,
 } from '../types/audit.type';
 import { SiteFetcher } from '../providers/site-fetcher';
+import {
+  SEO_TITLE_MIN,
+  SEO_TITLE_MAX,
+  SEO_DESCRIPTION_MIN,
+  SEO_DESCRIPTION_MAX,
+  SEO_ICON_PROBE_TIMEOUT,
+} from '../audit.constants';
 
 export const extractSchemaTypes = (node: unknown): string[] => {
   if (Array.isArray(node)) return node.flatMap(extractSchemaTypes);
@@ -28,12 +35,6 @@ export const extractSchemaTypes = (node: unknown): string[] => {
 
   return types.length ? types : ['unknown'];
 };
-
-const TITLE_MIN = 10;
-const TITLE_MAX = 60;
-const DESCRIPTION_MIN = 50;
-const DESCRIPTION_MAX = 160;
-const ICON_PROBE_TIMEOUT = 8_000;
 
 export interface SiteIcons {
   favicon: string | null;
@@ -199,7 +200,7 @@ export class SeoCheck implements AuditCheck {
 
   private title(value: string, category: AuditCategory): CheckResult {
     let status = CheckStatus.FAIL;
-    if (value.length >= TITLE_MIN && value.length <= TITLE_MAX) {
+    if (value.length >= SEO_TITLE_MIN && value.length <= SEO_TITLE_MAX) {
       status = CheckStatus.PASS;
     } else if (value.length) {
       status = CheckStatus.WARN;
@@ -212,13 +213,16 @@ export class SeoCheck implements AuditCheck {
       status,
       weight: 3,
       evidence: { title: value || null, length: value.length },
-      remediation: `Write a unique <title> between ${TITLE_MIN} and ${TITLE_MAX} characters - longer titles get truncated in results pages.`,
+      remediation: `Write a unique <title> between ${SEO_TITLE_MIN} and ${SEO_TITLE_MAX} characters - longer titles get truncated in results pages.`,
     });
   }
 
   private description(value: string, category: AuditCategory): CheckResult {
     let status = CheckStatus.FAIL;
-    if (value.length >= DESCRIPTION_MIN && value.length <= DESCRIPTION_MAX) {
+    if (
+      value.length >= SEO_DESCRIPTION_MIN &&
+      value.length <= SEO_DESCRIPTION_MAX
+    ) {
       status = CheckStatus.PASS;
     } else if (value.length) {
       status = CheckStatus.WARN;
@@ -231,7 +235,7 @@ export class SeoCheck implements AuditCheck {
       status,
       weight: 2,
       evidence: { description: value || null, length: value.length },
-      remediation: `Write a meta description between ${DESCRIPTION_MIN} and ${DESCRIPTION_MAX} characters summarising the page.`,
+      remediation: `Write a meta description between ${SEO_DESCRIPTION_MIN} and ${SEO_DESCRIPTION_MAX} characters summarising the page.`,
     });
   }
 
@@ -299,7 +303,7 @@ export class SeoCheck implements AuditCheck {
 
     try {
       const response = await this.fetcher.fetch(url, {
-        timeout: ICON_PROBE_TIMEOUT,
+        timeout: SEO_ICON_PROBE_TIMEOUT,
       });
       const contentType = response.headers['content-type'] ?? '';
       return {

@@ -7,11 +7,11 @@ import {
   CheckStatus,
 } from '../types/audit.type';
 import { SiteFetcher } from '../providers/site-fetcher';
-
-const PROBE_TIMEOUT = 8_000;
-/** Beyond these a sitemap is slow or bulky enough that crawlers start skipping it. */
-const SITEMAP_WARN_BYTES = 256 * 1024;
-const SITEMAP_WARN_MS = 3_000;
+import {
+  CRAWLABILITY_PROBE_TIMEOUT,
+  SITEMAP_WARN_BYTES,
+  SITEMAP_WARN_MS,
+} from '../audit.constants';
 
 interface ProbeResult {
   /** False when the request threw (timeout, DNS, connection refused). */
@@ -23,12 +23,6 @@ interface ProbeResult {
   error?: string;
 }
 
-/**
- * True only when the wildcard group blocks the whole site. A `Disallow: /`
- * under a *named* agent ("User-agent: BadBot") is a normal, deliberate block
- * and must not be reported - which is why this parses groups rather than
- * grepping the file for the directive.
- */
 export const blocksAllCrawlers = (robotsBody: string): boolean => {
   const lines = robotsBody
     .split(/\r?\n/)
@@ -158,7 +152,7 @@ export class CrawlabilityCheck implements AuditCheck {
     const startedAt = Date.now();
     try {
       const response = await this.fetcher.fetch(url, {
-        timeout: PROBE_TIMEOUT,
+        timeout: CRAWLABILITY_PROBE_TIMEOUT,
       });
       return {
         reached: true,
@@ -200,7 +194,7 @@ export class CrawlabilityCheck implements AuditCheck {
         weight: 2,
         evidence,
         remediation:
-          `/sitemap.xml could not be fetched within ${PROBE_TIMEOUT}ms (${sitemap.error}). ` +
+          `/sitemap.xml could not be fetched within ${CRAWLABILITY_PROBE_TIMEOUT}ms (${sitemap.error}). ` +
           'Crawlers apply similar limits, so a sitemap this slow is effectively missing. Split it with a sitemap index.',
       });
     }

@@ -13,7 +13,11 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuditService } from './audit.service';
-import { CreateAuditDto, FindAuditsDto } from './dto/audit.dto';
+import {
+  AuditAnalyticsDto,
+  CreateAuditDto,
+  FindAuditsDto,
+} from './dto/audit.dto';
 import { RateLimit, RateLimitGuard } from './guards/rate-limit.guard';
 import { AuditStatus } from './types/audit.type';
 import { AuthGuard, OptionalAuthGuard } from '../auth/guards/auth.guard';
@@ -72,6 +76,19 @@ export class AuditController {
     @Query() findAuditsDto: FindAuditsDto,
   ) {
     return this.auditService.findAll({ findAuditsDto, user: req.user });
+  }
+
+  @Get('analytics')
+  @UseGuards(AuthGuard)
+  @RateLimit({ limit: 60, windowSeconds: 60 })
+  getAnalytics(
+    @Req() req: AuthenticatedRequest,
+    @Query() auditAnalyticsDto: AuditAnalyticsDto,
+  ) {
+    return this.auditService.getAnalytics({
+      auditAnalyticsDto,
+      user: req.user,
+    });
   }
 
   @Get(':auditId')
